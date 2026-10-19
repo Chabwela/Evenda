@@ -31,7 +31,6 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final demo = ref.watch(backendProvider).isDemo;
     return Scaffold(
       backgroundColor: EvColors.forest,
       appBar: AppBar(backgroundColor: EvColors.forest, foregroundColor: EvColors.inkOnDark),
@@ -68,31 +67,6 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
                 ]),
               ),
             ),
-            if (demo) ...[
-              const SizedBox(height: EvSpace.x5),
-              Container(
-                padding: const EdgeInsets.all(EvSpace.x4),
-                decoration: BoxDecoration(color: EvColors.bronzeTint, borderRadius: EvRadius.mdAll),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    const Icon(LucideIcons.flaskConical, size: 16, color: EvColors.bronzeDeep),
-                    const SizedBox(width: 6),
-                    Text('Demo admin accounts', style: EvType.smallStrong.copyWith(color: EvColors.bronzeDeep)),
-                  ]),
-                  const SizedBox(height: 6),
-                  Text('Password for all: demo-admin. Each role sees only what its permissions allow.', style: EvType.caption.copyWith(color: EvColors.bronzeDeep)),
-                  const SizedBox(height: 8),
-                  for (final e in const ['super@demo.evenda.zm', 'moderator@demo.evenda.zm', 'support@demo.evenda.zm', 'finance@demo.evenda.zm'])
-                    InkWell(
-                      onTap: () => setState(() {
-                        _email.text = e;
-                        _password.text = 'demo-admin';
-                      }),
-                      child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(e, style: EvType.small.copyWith(color: EvColors.bronzeDeep, decoration: TextDecoration.underline))),
-                    ),
-                ]),
-              ),
-            ],
           ]),
         ),
       ),

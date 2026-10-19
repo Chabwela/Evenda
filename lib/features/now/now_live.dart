@@ -13,7 +13,6 @@ import 'package:uuid/uuid.dart';
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/backend.dart';
-import '../../data/demo/demo_backend.dart';
 import '../../design/ev.dart';
 import '../../domain/models.dart';
 import '../shared/map_widgets.dart';
@@ -53,7 +52,6 @@ class _NowLiveScreenState extends ConsumerState<NowLiveScreen> with TickerProvid
   Object? _error;
   Timer? _clock;
   bool _mapReady = false;
-  bool _simulating = false;
 
   NowApi get _api => ref.read(backendProvider).now;
 
@@ -225,14 +223,6 @@ class _NowLiveScreenState extends ConsumerState<NowLiveScreen> with TickerProvid
       await _broadcast(radiusKm: km);
       await _reload(animateReveal: true);
     });
-  }
-
-  Future<void> _simulate() async {
-    final b = ref.read(backendProvider);
-    if (b is! DemoBackend) return;
-    setState(() => _simulating = true);
-    await b.simulateSupplierReplies(widget.id);
-    if (mounted) setState(() => _simulating = false);
   }
 
   @override
@@ -417,7 +407,6 @@ class _NowLiveScreenState extends ConsumerState<NowLiveScreen> with TickerProvid
     final selected = _offers.where((o) => o.status == NowOfferStatus.selected).toList();
     final covered = selected.fold(0, (s, o) => s + o.quantity);
     final noMatch = _phase == _Phase.revealed && req.status == NowStatus.draft && _vendors.isEmpty;
-    final demo = ref.watch(backendProvider).isDemo;
 
     final statusLabel = switch (_phase) {
       _Phase.loading || _Phase.dropping => 'Preparing request',
@@ -520,20 +509,6 @@ class _NowLiveScreenState extends ConsumerState<NowLiveScreen> with TickerProvid
                 ),
               for (final o in pending)
                 _OfferCard(offer: o, request: req, busy: _busyOffer == o.id, fresh: _fresh.contains(o.id), onSelect: () => _select(o)),
-              if (demo && pending.isEmpty && _vendors.any((v) => !v.hasOffer && !v.declined))
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x4, EvSpace.gutter, 0),
-                  child: EvSurface(
-                    color: EvColors.bronzeTint,
-                    padding: const EdgeInsets.all(EvSpace.x3),
-                    child: Row(children: [
-                      const Icon(LucideIcons.flaskConical, size: 16, color: EvColors.bronzeDeep),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text('Demo control: let the notified demo suppliers reply using their real listings.', style: EvType.caption.copyWith(color: EvColors.bronzeDeep))),
-                      EvButton('Simulate', compact: true, kind: EvButtonKind.quiet, loading: _simulating, onPressed: _simulate),
-                    ]),
-                  ),
-                ),
               SectionHeader('Notified', count: _vendors.length, padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x6, EvSpace.gutter, EvSpace.x2)),
               for (final v in _vendors)
                 EvRow(

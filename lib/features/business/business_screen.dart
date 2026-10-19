@@ -25,7 +25,6 @@ class BusinessScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final biz = ref.watch(myBusinessProvider).value;
     final hub = ref.watch(_hubProvider).value;
-    final demo = ref.watch(backendProvider).isDemo;
     final session = ref.watch(sessionProvider).value;
     if (biz == null) return const Scaffold(body: Skeleton());
 
@@ -122,18 +121,6 @@ class BusinessScreen extends ConsumerWidget {
           ),
           EvRow(leading: const IconTile(LucideIcons.store), title: 'Business profile', subtitle: 'Contact, location, hours, verification', onTap: () => context.push('/business/profile')),
         ]),
-
-        if (demo) ...[
-          const SectionHeader('Demo'),
-          group([
-            EvRow(
-              leading: const IconTile(LucideIcons.flaskConical, tone: Tone.waiting),
-              title: 'Demo controls',
-              subtitle: 'Switch vendor, reset data, open the admin console',
-              onTap: () => context.push('/business/demo'),
-            ),
-          ]),
-        ],
 
         const SizedBox(height: EvSpace.x6),
         Padding(

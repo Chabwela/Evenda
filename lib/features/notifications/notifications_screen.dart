@@ -36,7 +36,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   void _open(AppNotification n) {
     ref.read(backendProvider).notifications.markRead(n.id);
-    if (n.route != null) context.push(n.route!);
+    if (n.route != null && n.route != '/notifications') context.push(n.route!);
   }
 
   @override

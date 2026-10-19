@@ -166,14 +166,11 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
           ]),
           if (biz.verification == VerificationStatus.unverified || biz.verification == VerificationStatus.rejected) ...[
             const SizedBox(height: EvSpace.x3),
-            Row(children: [
-              Expanded(child: EvButton('Upload document', kind: EvButtonKind.secondary, icon: LucideIcons.fileUp, onPressed: _uploadDoc)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: EvButton('Submit for review', icon: LucideIcons.shieldCheck,
-                    onPressed: () => guard(context, () => ref.read(backendProvider).business.submitForVerification(b.id), success: 'Submitted for verification')),
-              ),
-            ]),
+            // Stacked: side by side, both labels were cut off on 360 dp phones.
+            EvButton('Upload document', kind: EvButtonKind.secondary, icon: LucideIcons.fileUp, expand: true, onPressed: _uploadDoc),
+            const SizedBox(height: 8),
+            EvButton('Submit for review', icon: LucideIcons.shieldCheck, expand: true,
+                onPressed: () => guard(context, () => ref.read(backendProvider).business.submitForVerification(b.id), success: 'Submitted for verification')),
           ],
           const SectionHeader('Identity', padding: EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
           EvField(label: 'Business name', controller: _name, validator: (v) => (v == null || v.trim().length < 2) ? 'Required' : null),

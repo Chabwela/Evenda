@@ -169,11 +169,9 @@ class TabHeader extends ConsumerWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unread = ref.watch(unreadCountProvider).value ?? 0;
-    final demo = ref.watch(backendProvider).isDemo;
     return AppBar(
       title: Row(children: [
         Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
-        if (demo) ...[const SizedBox(width: 10), const DemoBadge(label: 'Demo')],
       ]),
       bottom: bottom,
       actions: [

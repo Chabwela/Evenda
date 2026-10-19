@@ -144,7 +144,6 @@ class _HomeBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider).value;
     final unread = ref.watch(unreadCountProvider).value ?? 0;
-    final demo = ref.watch(backendProvider).isDemo;
     final first = (session?.fullName ?? '').split(' ').first;
     final priorities = _priorities(d);
     final upcoming = d.events.where((e) => e.status != EventStatus.cancelled && e.endsAt.isAfter(DateTime.now())).take(6).toList();
@@ -162,7 +161,6 @@ class _HomeBody extends ConsumerWidget {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
                     Flexible(child: Text(d.business.name, style: EvType.smallStrong.copyWith(color: EvColors.ink2), overflow: TextOverflow.ellipsis)),
-                    if (demo) ...[const SizedBox(width: 8), const DemoBadge(label: 'Demo')],
                   ]),
                   const SizedBox(height: 4),
                   Text(first.isEmpty ? _greeting() : '${_greeting()}, $first', style: EvType.display),

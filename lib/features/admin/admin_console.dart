@@ -71,7 +71,6 @@ class _AdminConsoleScreenState extends ConsumerState<AdminConsoleScreen> {
       backgroundColor: EvColors.cream,
       title: Row(children: [
         Text(_s.label),
-        if (session.isDemo) ...[const SizedBox(width: 10), const DemoBadge(label: 'Demo')],
       ]),
       actions: [
         Padding(

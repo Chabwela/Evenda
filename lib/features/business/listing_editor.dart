@@ -9,12 +9,6 @@ import '../../app/providers.dart';
 import '../../design/ev.dart';
 import '../../domain/models.dart';
 
-/// Demo photo library, used when uploads are unavailable (demo mode).
-const _demoPhotos = [
-  'marquee_chairs', 'pole_tent', 'chair_sashes', 'table_setting', 'centrepiece', 'stage_lights', 'catering', 'backdrop_lights',
-  'florals', 'pompom_decor', 'pa_speakers', 'folding_chairs', 'chiavari_chair', 'tent_round_table', 'sound_mixer',
-];
-
 /// One form for rental, service and package listings. Fields adapt to the
 /// kind: services describe capacity and portfolio, never stock counts.
 /// Editing a quantity here is recorded as a stock correction; it never
@@ -78,26 +72,6 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
 
   Future<void> _addPhotos() async {
     final backend = ref.read(backendProvider);
-    if (backend.isDemo) {
-      final picked = await showEvSheet<String>(
-        context,
-        title: 'Demo photo library',
-        subtitle: 'Uploads need a configured backend. Pick a demo photo instead.',
-        builder: (c) => GridView.count(
-          shrinkWrap: true,
-          crossAxisCount: 3,
-          padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, EvSpace.x6),
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          children: [
-            for (final p in _demoPhotos)
-              InkWell(onTap: () => Navigator.pop(c, 'asset:assets/images/$p.jpg'), child: EvPhoto('asset:assets/images/$p.jpg', radius: EvRadius.sm)),
-          ],
-        ),
-      );
-      if (picked != null) setState(() => _d!.photos = [..._d!.photos, picked]);
-      return;
-    }
     final files = await ImagePicker().pickMultiImage(maxWidth: 1600, imageQuality: 82, limit: 8);
     if (files.isEmpty || !mounted) return;
     setState(() => _uploading = true);
@@ -347,7 +321,6 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
             const SizedBox(width: 10),
           ],
           Expanded(
-            flex: 2,
             child: EvButton(_original?.status == ListingStatus.published ? 'Save changes' : 'Publish', expand: true, loading: _busy, icon: LucideIcons.send,
                 onPressed: () => _save(ListingStatus.published)),
           ),

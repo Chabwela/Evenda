@@ -13,7 +13,6 @@ import '../features/bookings/quotation_composer.dart';
 import '../features/bookings/request_detail.dart';
 import '../features/business/availability_screen.dart';
 import '../features/business/business_screen.dart';
-import '../features/business/demo_controls.dart';
 import '../features/business/inventory_screen.dart';
 import '../features/business/listing_editor.dart';
 import '../features/business/listings_screen.dart';
@@ -133,7 +132,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       _r('/business/availability', (s) => AvailabilityScreen(listingId: s.uri.queryParameters['listing'])),
       _r('/business/team', (_) => const TeamScreen()),
       _r('/business/notifications', (_) => const NotificationSettingsScreen()),
-      _r('/business/demo', (_) => const DemoControlsScreen()),
       _r('/now', (_) => const NowHomeScreen()),
       _r('/now/new', (s) => NowCreateScreen(categoryId: s.uri.queryParameters['category'], quantity: int.tryParse(s.uri.queryParameters['qty'] ?? ''),
           item: s.uri.queryParameters['item'], date: s.uri.queryParameters['date'])),
