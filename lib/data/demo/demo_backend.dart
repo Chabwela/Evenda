@@ -1742,6 +1742,9 @@ class _DemoAdmin implements AdminApi {
   @override
   AdminSession? get current => _session;
 
+  @override
+  Future<AdminSession?> restore() async => _session;
+
   /// Demo admin sign-in: any of the demo admin accounts listed on the sign-in screen.
   static const accounts = {
     'super@demo.evenda.zm': (AdminRole.superAdmin, 'Demo super admin'),

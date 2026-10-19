@@ -45,6 +45,15 @@ final sessionProvider = StreamProvider<Session?>((ref) async* {
   yield* auth.sessions;
 });
 
+/// Platform-admin role of the signed-in account, or null for vendors.
+/// Re-evaluated on every sign-in/out, so an admin reopening the app lands in
+/// the console instead of vendor onboarding.
+final adminSessionProvider = FutureProvider<AdminSession?>((ref) async {
+  final session = ref.watch(sessionProvider).value;
+  if (session == null) return null;
+  return ref.watch(backendProvider).admin.restore();
+});
+
 /// The signed-in user's business, or null while onboarding has not started.
 final myBusinessProvider = FutureProvider<Business?>((ref) async {
   ref.watchDomains(const [DataDomain.business, DataDomain.session]);

@@ -50,7 +50,9 @@ class _AdminConsoleScreenState extends ConsumerState<AdminConsoleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final session = ref.watch(backendProvider).admin.current;
+    final restoring = ref.watch(adminSessionProvider);
+    final session = restoring.value ?? ref.watch(backendProvider).admin.current;
+    if (session == null && restoring.isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (session == null) {
       return Scaffold(
         appBar: AppBar(),

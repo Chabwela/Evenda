@@ -42,6 +42,7 @@ class _RouterRefresh extends ChangeNotifier {
   _RouterRefresh(Ref ref) {
     ref.listen(sessionProvider, (_, _) => notifyListeners());
     ref.listen(myBusinessProvider, (_, _) => notifyListeners());
+    ref.listen(adminSessionProvider, (_, _) => notifyListeners());
     ref.listen(onboardingCelebrationProvider, (_, _) => notifyListeners());
   }
 }
@@ -67,13 +68,17 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: refresh,
     redirect: (context, state) {
       final loc = state.matchedLocation;
-      if (loc.startsWith('/admin')) return null; // separate admin auth
+      if (loc.startsWith('/admin')) return null; // the console checks its own access
       final session = ref.read(sessionProvider);
       final business = ref.read(myBusinessProvider);
       final open = loc == '/welcome' || loc.startsWith('/auth');
 
       if (session.isLoading && !session.hasValue) return loc == '/launch' ? null : '/launch';
       if (session.value == null) return open ? null : '/welcome';
+      // Staff accounts belong in the console, never in vendor onboarding.
+      final admin = ref.read(adminSessionProvider);
+      if (admin.isLoading && !admin.hasValue) return loc == '/launch' ? null : '/launch';
+      if (admin.value != null) return '/admin';
       // Signed-in screens that live under /auth: name capture and the last
       // step of a password reset (the recovery code signs the user in).
       if (loc == '/auth/profile' || loc == '/auth/new-password') return null;

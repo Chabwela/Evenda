@@ -208,6 +208,10 @@ abstract class NowApi {
 abstract class AdminApi {
   AdminSession? get current;
   Future<AdminSession> signIn(String email, String password);
+
+  /// Admin role of whoever is signed in now (e.g. after an app restart),
+  /// or null for vendors. Never throws for non-admins.
+  Future<AdminSession?> restore();
   Future<void> signOut();
 
   Future<Map<String, int>> stats();

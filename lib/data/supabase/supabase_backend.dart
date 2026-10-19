@@ -1228,6 +1228,15 @@ class _SbAdmin implements AdminApi {
   }
 
   @override
+  Future<AdminSession?> restore() async {
+    final user = b.client.auth.currentUser;
+    if (user == null) return _session = null;
+    if (_session?.userId == user.id) return _session;
+    final role = AdminRole.tryParse(await b.rpc('my_admin_role') as String?);
+    return _session = role == null ? null : AdminSession(userId: user.id, role: role, displayName: user.email ?? 'Admin');
+  }
+
+  @override
   Future<void> signOut() async {
     _session = null;
     await b._signOut();
