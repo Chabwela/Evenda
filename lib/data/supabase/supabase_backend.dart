@@ -1243,6 +1243,21 @@ class _SbAdmin implements AdminApi {
   }
 
   @override
+  Future<AdminBusinessDetail> businessDetail(String businessId) async =>
+      AdminBusinessDetail((await b.rpc('admin_business_detail', {'p_business': businessId}) as Map).cast<String, dynamic>());
+
+  @override
+  Future<String> documentUrl(String storagePath) =>
+      // 10 minutes: long enough to review, short enough that a forwarded link dies.
+      b.call(() => b.client.storage.from('verification').createSignedUrl(storagePath, 600));
+
+  @override
+  Future<void> reviewDocument(String documentId, String status, String note) async {
+    await b.rpc('admin_review_document', {'p_document': documentId, 'p_status': status, 'p_note': note});
+    b.touch({DataDomain.admin});
+  }
+
+  @override
   Future<Map<String, int>> stats() async {
     final m = await b.rpc('admin_platform_stats') as Map<String, dynamic>;
     return m.map((k, v) => MapEntry(k, (v as num).toInt()));

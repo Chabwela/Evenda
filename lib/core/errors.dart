@@ -45,6 +45,9 @@ class EvError implements Exception {
     'items_required': 'Add at least one item.',
     'stock_below_out_of_service': 'Total stock cannot be lower than damaged and inspection counts.',
     'documents_required': 'Upload at least one document first.',
+    'documents_not_reviewed': 'Accept at least one verification document before verifying this business.',
+    'invalid_status': 'That status is not allowed here.',
+    'not_found': 'Not found, or you do not have access.',
   };
 
   static EvError from(Object e) {

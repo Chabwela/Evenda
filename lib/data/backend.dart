@@ -215,6 +215,16 @@ abstract class AdminApi {
   Future<void> signOut();
 
   Future<Map<String, int>> stats();
+
+  /// Full review view of one business: owner, documents, counts, history.
+  Future<AdminBusinessDetail> businessDetail(String businessId);
+
+  /// Short-lived link to a private verification document.
+  Future<String> documentUrl(String storagePath);
+
+  /// Accept or reject one document ('accepted' / 'rejected'); a note is
+  /// required when rejecting.
+  Future<void> reviewDocument(String documentId, String status, String note);
   Future<List<AdminBusinessRow>> businesses({String? search, VerificationStatus? verification});
   Future<void> setVerification(String businessId, VerificationStatus status, String reason);
   Future<void> setBusinessStatus(String businessId, BusinessStatus status, String reason);

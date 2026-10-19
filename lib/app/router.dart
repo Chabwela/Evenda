@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../core/push.dart';
 import '../design/ev.dart';
 import '../features/admin/admin_console.dart';
+import '../features/admin/admin_business_review.dart';
 import '../features/admin/admin_login.dart';
 import '../features/auth/auth_screens.dart';
 import '../features/bookings/booking_detail.dart';
@@ -142,6 +143,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           item: s.uri.queryParameters['item'], date: s.uri.queryParameters['date'])),
       _r('/now/respond/:id', (s) => NowRespondScreen(id: s.pathParameters['id']!)),
       _r('/now/:id', (s) => NowLiveScreen(id: s.pathParameters['id']!)),
+      _r('/admin/business/:id', (s) => AdminBusinessReviewScreen(id: s.pathParameters['id']!)),
       _r('/admin', (_) => const AdminConsoleScreen()),
       _r('/admin/login', (_) => const AdminLoginScreen()),
     ],

@@ -1745,6 +1745,15 @@ class _DemoAdmin implements AdminApi {
   @override
   Future<AdminSession?> restore() async => _session;
 
+  @override
+  Future<AdminBusinessDetail> businessDetail(String businessId) async => throw const EvError('not_found', 'Business review needs the live backend.');
+
+  @override
+  Future<String> documentUrl(String storagePath) async => throw const EvError('not_found', 'Documents need the live backend.');
+
+  @override
+  Future<void> reviewDocument(String documentId, String status, String note) async => throw const EvError('not_found', 'Documents need the live backend.');
+
   /// Demo admin sign-in: any of the demo admin accounts listed on the sign-in screen.
   static const accounts = {
     'super@demo.evenda.zm': (AdminRole.superAdmin, 'Demo super admin'),

@@ -1852,3 +1852,55 @@ class Dispute {
         resolution: r['resolution'],
       );
 }
+
+/// Everything an admin needs to judge one business (admin_business_detail).
+class AdminBusinessDetail {
+  AdminBusinessDetail(this.raw);
+  final Map<String, dynamic> raw;
+
+  String get id => raw['id'];
+  String get name => raw['name'] ?? '';
+  String get description => raw['description'] ?? '';
+  String? get logoPath => raw['logo_path'];
+  String? get primaryCategory => raw['primary_category'];
+  List<String> get offeringTypes => [for (final o in (raw['offering_types'] as List? ?? const [])) o.toString()];
+  String? get phone => raw['phone'];
+  String? get whatsapp => raw['whatsapp'];
+  String? get email => raw['email'];
+  String? get neighbourhood => raw['neighbourhood'];
+  String? get addressLine => raw['address_line'];
+  double? get lat => (raw['lat'] as num?)?.toDouble();
+  double? get lng => (raw['lng'] as num?)?.toDouble();
+  int get serviceRadiusKm => (raw['service_radius_km'] as num?)?.toInt() ?? 0;
+  VerificationStatus get verification => VerificationStatus.parse(raw['verification_status']);
+  BusinessStatus get status => BusinessStatus.parse(raw['status']);
+  DateTime get createdAt => DateTime.parse(raw['created_at']).toLocal();
+  bool get onboarded => raw['onboarding_completed_at'] != null;
+  Map<String, dynamic> get owner => (raw['owner'] as Map?)?.cast<String, dynamic>() ?? const {};
+  Map<String, dynamic> get counts => (raw['counts'] as Map?)?.cast<String, dynamic>() ?? const {};
+  List<AdminDocument> get documents => [for (final d in (raw['documents'] as List? ?? const [])) AdminDocument((d as Map).cast())];
+  List<Map<String, dynamic>> get team => [for (final t in (raw['team'] as List? ?? const [])) (t as Map).cast()];
+  List<Map<String, dynamic>> get history => [for (final h in (raw['history'] as List? ?? const [])) (h as Map).cast()];
+  bool get hasAcceptedDocument => documents.any((d) => d.status == 'accepted');
+}
+
+class AdminDocument {
+  AdminDocument(this.raw);
+  final Map<String, dynamic> raw;
+  String get id => raw['id'];
+  String get docType => raw['doc_type'] ?? 'other';
+  String get storagePath => raw['storage_path'];
+  String get status => raw['status'] ?? 'submitted';
+  DateTime get createdAt => DateTime.parse(raw['created_at']).toLocal();
+  DateTime? get reviewedAt => raw['reviewed_at'] == null ? null : DateTime.parse(raw['reviewed_at']).toLocal();
+  String? get reviewNote => raw['review_note'];
+  String? get reviewedBy => raw['reviewed_by'];
+  bool get isPdf => storagePath.toLowerCase().endsWith('.pdf');
+
+  String get typeLabel => switch (docType) {
+        'pacra_certificate' => 'PACRA certificate',
+        'tpin' => 'ZRA TPIN certificate',
+        'national_id' => 'National ID (NRC)',
+        _ => 'Other document',
+      };
+}

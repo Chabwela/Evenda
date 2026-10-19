@@ -229,7 +229,6 @@ class _BusinessesState extends ConsumerState<_Businesses> {
   Widget build(BuildContext context) {
     ref.watch(revisionProvider.select((m) => m[DataDomain.admin]));
     final api = ref.read(backendProvider).admin;
-    final role = api.current!.role;
     return Column(children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, EvSpace.x2),
@@ -265,39 +264,13 @@ class _BusinessesState extends ConsumerState<_Businesses> {
                     StatusPill(b.verification.label, tone: toneForVerification(b.verification), dense: true),
                     if (b.status == BusinessStatus.suspended) ...[const SizedBox(width: 6), const StatusPill('Suspended', tone: Tone.critical, dense: true)],
                   ]),
-                  trailing: role.can('business.verify')
-                      ? PopupMenuButton<String>(
-                          icon: const Icon(LucideIcons.ellipsisVertical, size: 18),
-                          onSelected: (v) async {
-                            final (title, status, required) = switch (v) {
-                              'verify' => ('Verify ${b.name}?', VerificationStatus.verified, false),
-                              'reject' => ('Reject verification?', VerificationStatus.rejected, true),
-                              _ => ('', null, true),
-                            };
-                            if (v == 'suspend' || v == 'reactivate') {
-                              final reason = await confirmWithReason(context,
-                                  title: v == 'suspend' ? 'Suspend ${b.name}?' : 'Reactivate ${b.name}?',
-                                  body: v == 'suspend' ? 'Their listings disappear from search and they cannot transact.' : 'They can transact again.',
-                                  destructive: v == 'suspend');
-                              if (reason != null && context.mounted) {
-                                await guard(context, () => api.setBusinessStatus(b.id, v == 'suspend' ? BusinessStatus.suspended : BusinessStatus.active, reason), success: 'Recorded in audit log');
-                                setState(() {});
-                              }
-                              return;
-                            }
-                            final reason = await confirmWithReason(context, title: title, body: 'The business is notified. Your reason is stored in the audit log.', required: required);
-                            if (reason != null && context.mounted) {
-                              await guard(context, () => api.setVerification(b.id, status!, reason), success: 'Verification updated');
-                              setState(() {});
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            if (b.verification != VerificationStatus.verified) const PopupMenuItem(value: 'verify', child: Text('Verify')),
-                            if (b.verification != VerificationStatus.rejected) const PopupMenuItem(value: 'reject', child: Text('Reject verification')),
-                            PopupMenuItem(value: b.status == BusinessStatus.active ? 'suspend' : 'reactivate', child: Text(b.status == BusinessStatus.active ? 'Suspend' : 'Reactivate')),
-                          ],
-                        )
-                      : null,
+                  // Decisions happen on the review screen, after the documents
+                  // have been opened; the list no longer offers blind verify.
+                  trailing: const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
+                  onTap: () async {
+                    await context.push('/admin/business/${b.id}');
+                    if (mounted) setState(() {});
+                  },
                 );
               },
             );
@@ -347,6 +320,8 @@ class _ListingsState extends ConsumerState<_Listings> {
                   title: l.title,
                   subtitle: '${l.business?.name ?? ''} · ${priceLabel(l)}',
                   meta: l.moderation == ModerationStatus.ok ? null : StatusPill(l.moderation.name, tone: Tone.critical, dense: true),
+                  // See what you are moderating: photos, description, terms.
+                  onTap: () => _previewListing(context, l),
                   trailing: PopupMenuButton<ModerationStatus>(
                     icon: const Icon(LucideIcons.ellipsisVertical, size: 18),
                     onSelected: (st) async {
@@ -536,4 +511,44 @@ class _Audit extends ConsumerWidget {
           },
         ),
       );
+}
+
+void _previewListing(BuildContext context, Listing l) {
+  showEvSheet<void>(
+    context,
+    title: l.title,
+    subtitle: '${l.business?.name ?? ''} · ${categoryById(l.categoryId).name}',
+    // showEvSheet does not scroll its content itself; photos make this tall.
+    builder: (c) => SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, EvSpace.x8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (l.photos.isEmpty)
+          EvSurface(color: EvColors.warningTint, child: Text('No photos.', style: EvType.small.copyWith(color: EvColors.warning)))
+        else
+          for (final p in l.photos)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: AspectRatio(aspectRatio: 4 / 3, child: EvPhoto(p, radius: EvRadius.md)),
+            ),
+        const SizedBox(height: EvSpace.x2),
+        Text(priceLabel(l), style: EvType.money),
+        if (l.tracksStock && l.kind != OfferingType.service) Text('${l.usable} in stock · ${l.totalQuantity} owned', style: EvType.small),
+        if (l.description.isNotEmpty) ...[const SizedBox(height: EvSpace.x3), Text(l.description, style: EvType.body)],
+        if (l.terms.isNotEmpty) ...[
+          const SizedBox(height: EvSpace.x3),
+          Text('TERMS', style: EvType.overline),
+          Text(l.terms, style: EvType.small),
+        ],
+        if (l.moderationReason != null) ...[
+          const SizedBox(height: EvSpace.x3),
+          Text('Moderation note: ${l.moderationReason}', style: EvType.small.copyWith(color: EvColors.danger)),
+        ],
+        const SizedBox(height: EvSpace.x4),
+        EvButton('Review ${l.business?.name ?? 'business'}', kind: EvButtonKind.secondary, icon: LucideIcons.store, expand: true, onPressed: () {
+          Navigator.pop(c);
+          context.push('/admin/business/${l.businessId}');
+        }),
+      ]),
+    ),
+  );
 }
