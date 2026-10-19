@@ -641,6 +641,9 @@ class _DemoDiscovery implements DiscoveryApi {
   DemoDb get db => b.db;
 
   @override
+  Future<List<Category>> categories() async => CategoryCatalog.all;
+
+  @override
   Future<List<SearchResult>> search(String myBusinessId, SearchQuery q) async {
     await DemoBackend.latency(280);
     final me = db.businesses[myBusinessId];
@@ -1741,6 +1744,9 @@ class _DemoAdmin implements AdminApi {
 
   @override
   AdminSession? get current => _session;
+
+  @override
+  Future<Map<String, ({int listings, int businesses})>> categoryUsage() async => const {};
 
   @override
   Future<AdminSession?> restore() async => _session;

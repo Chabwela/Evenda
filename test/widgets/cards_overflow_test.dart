@@ -1,5 +1,4 @@
 import 'package:evenda/design/ev.dart';
-import 'package:evenda/domain/enums.dart';
 import 'package:evenda/domain/models.dart';
 import 'package:evenda/features/shared/feed_cards.dart';
 import 'package:flutter/material.dart';

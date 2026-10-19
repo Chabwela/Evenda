@@ -10,6 +10,8 @@ class EvendaApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Rebuild once the live category catalogue arrives, so pickers show it.
+    ref.watch(categoryCatalogProvider);
     return MaterialApp.router(
       title: 'Evenda',
       debugShowCheckedModeBanner: false,

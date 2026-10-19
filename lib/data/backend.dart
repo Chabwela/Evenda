@@ -121,6 +121,9 @@ abstract class ListingApi {
 }
 
 abstract class DiscoveryApi {
+  /// Every category, active and hidden (the catalogue is admin-managed).
+  Future<List<Category>> categories();
+
   Future<List<SearchResult>> search(String myBusinessId, SearchQuery query);
   Future<Business> supplier(String businessId);
   Future<List<Listing>> supplierListings(String businessId);
@@ -236,4 +239,7 @@ abstract class AdminApi {
   Future<void> resolveDispute(String disputeId, String status, String resolution);
   Future<List<AuditEntry>> auditLog();
   Future<void> upsertCategory(Category category, bool active, String reason);
+
+  /// Per category: how many published listings and how many businesses use it.
+  Future<Map<String, ({int listings, int businesses})>> categoryUsage();
 }

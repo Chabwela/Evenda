@@ -469,7 +469,17 @@ Future<T?> pickFromSheet<T>(BuildContext context, {required String title, requir
   );
 }
 
-IconData categoryIcon(String? categoryId) => switch (categoryById(categoryId).icon) {
+IconData categoryIcon(String? categoryId) => iconForCategoryKey(categoryById(categoryId).icon);
+
+/// Icon keys admins can choose for a category (mirrors the server check in
+/// admin_upsert_category).
+const kCategoryIconKeys = [
+  'tent', 'armchair', 'table', 'shirt', 'sparkles', 'flower', 'speaker', 'lightbulb', 'layers', 'cooking_pot',
+  'palette', 'utensils', 'flower_2', 'camera', 'music', 'clipboard_list', 'cake', 'car', 'mic', 'baby', 'gift',
+  'video', 'scissors', 'paintbrush', 'package',
+];
+
+IconData iconForCategoryKey(String key) => switch (key) {
       'tent' => LucideIcons.tent,
       'armchair' => LucideIcons.armchair,
       'table' => LucideIcons.table,
@@ -486,5 +496,13 @@ IconData categoryIcon(String? categoryId) => switch (categoryById(categoryId).ic
       'camera' => LucideIcons.camera,
       'music' => LucideIcons.music,
       'clipboard_list' => LucideIcons.clipboardList,
+      'cake' => LucideIcons.cake,
+      'car' => LucideIcons.car,
+      'mic' => LucideIcons.mic,
+      'baby' => LucideIcons.baby,
+      'gift' => LucideIcons.gift,
+      'video' => LucideIcons.video,
+      'scissors' => LucideIcons.scissors,
+      'paintbrush' => LucideIcons.paintbrush,
       _ => LucideIcons.package,
     };

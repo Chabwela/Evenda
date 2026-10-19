@@ -419,7 +419,7 @@ class _SbBusiness implements BusinessApi {
 
   @override
   Future<List<TeamMember>> team(String businessId) async {
-    final rows = await b.call(() => b.client.from('business_members').select().eq('business_id', businessId).neq('status', 'removed').order('created_at'));
+    final rows = await b.call(() => b.client.from('business_members').select().eq('business_id', businessId).neq('status', 'removed').order('created_at', ascending: true));
     return [for (final r in rows) TeamMember.fromRow(r)];
   }
 
@@ -557,7 +557,7 @@ class _SbListings implements ListingApi {
     var q = b.client.from('reservations').select('*, listings(title)').eq('business_id', businessId).neq('status', 'cancelled');
     if (listingId != null) q = q.eq('listing_id', listingId);
     if (upcomingOnly) q = q.gte('ends_on', b._date(EvDates.today()));
-    final rows = await b.call(() => q.order('starts_on'));
+    final rows = await b.call(() => q.order('starts_on', ascending: true));
     return [for (final r in rows) Reservation.fromRow(r)];
   }
 
@@ -582,7 +582,7 @@ class _SbListings implements ListingApi {
 
   @override
   Future<List<AvailabilityBlock>> blocks(String businessId) async {
-    final rows = await b.call(() => b.client.from('availability_blocks').select().eq('business_id', businessId).order('starts_on'));
+    final rows = await b.call(() => b.client.from('availability_blocks').select().eq('business_id', businessId).order('starts_on', ascending: true));
     return [for (final r in rows) AvailabilityBlock.fromRow(r)];
   }
 
@@ -615,6 +615,12 @@ class _SbListings implements ListingApi {
 class _SbDiscovery implements DiscoveryApi {
   _SbDiscovery(this.b);
   final SupabaseBackend b;
+
+  @override
+  Future<List<Category>> categories() async {
+    final rows = await b.call(() => b.client.from('categories').select('id, name, kind, icon, sort, active').order('sort', ascending: true));
+    return [for (final r in rows) Category.fromRow(r)];
+  }
 
   @override
   Future<List<SearchResult>> search(String myBusinessId, SearchQuery q) async {
@@ -816,7 +822,7 @@ class _SbBookings implements BookingApi {
         .from('bookings')
         .select(Booking.columns)
         .or('requester_business_id.eq.$businessId,supplier_business_id.eq.$businessId')
-        .order('starts_on')
+        .order('starts_on', ascending: true)
         .limit(200));
     return [for (final r in rows) Booking.fromRow(r)];
   }
@@ -867,7 +873,7 @@ class _SbWork implements WorkApi {
 
   @override
   Future<List<EventPlan>> events(String businessId) async {
-    final rows = await b.call(() => b.client.from('events').select(_eventCols).eq('business_id', businessId).order('starts_at'));
+    final rows = await b.call(() => b.client.from('events').select(_eventCols).eq('business_id', businessId).order('starts_at', ascending: true));
     return [for (final r in rows) EventPlan.fromRow(r)];
   }
 
@@ -927,7 +933,7 @@ class _SbWork implements WorkApi {
     var q = b.client.from('tasks').select('*, events(name)').eq('business_id', businessId);
     if (eventId != null) q = q.eq('event_id', eventId);
     if (!includeDone) q = q.inFilter('status', ['todo', 'in_progress']);
-    final rows = await b.call(() => q.order('due_at').limit(300));
+    final rows = await b.call(() => q.order('due_at', ascending: true).limit(300));
     return [for (final r in rows) WorkTask.fromRow(r)];
   }
 
@@ -988,7 +994,7 @@ class _SbWork implements WorkApi {
 
   @override
   Future<List<TaskReminder>> reminders(String taskId) async {
-    final rows = await b.call(() => b.client.from('reminders').select().eq('task_id', taskId).order('remind_at'));
+    final rows = await b.call(() => b.client.from('reminders').select().eq('task_id', taskId).order('remind_at', ascending: true));
     return [for (final r in rows) TaskReminder.fromRow(r)];
   }
 
@@ -1130,7 +1136,7 @@ class _SbNow implements NowApi {
 
   @override
   Future<List<NowOffer>> offers(String requestId) async {
-    final rows = await b.call(() => b.client.from('now_offers').select(NowOffer.columns).eq('request_id', requestId).neq('status', 'withdrawn').order('created_at'));
+    final rows = await b.call(() => b.client.from('now_offers').select(NowOffer.columns).eq('request_id', requestId).neq('status', 'withdrawn').order('created_at', ascending: true));
     return [for (final r in rows) NowOffer.fromRow(r)];
   }
 
@@ -1318,6 +1324,24 @@ class _SbAdmin implements AdminApi {
   }
 
   @override
-  Future<void> upsertCategory(Category c, bool active, String reason) =>
-      b.rpc('admin_upsert_category', {'p_id': c.id, 'p_name': c.name, 'p_kind': c.kind.wire, 'p_active': active, 'p_reason': reason});
+  Future<void> upsertCategory(Category c, bool active, String reason) async {
+    await b.rpc('admin_upsert_category',
+        {'p_id': c.id, 'p_name': c.name, 'p_kind': c.kind.wire, 'p_active': active, 'p_reason': reason, 'p_icon': c.icon, 'p_sort': c.sort});
+    b.touch({DataDomain.admin, DataDomain.discovery});
+  }
+
+  @override
+  Future<Map<String, ({int listings, int businesses})>> categoryUsage() async {
+    // Admin RLS allows reading all listings; business_categories is readable by all.
+    final listings = await b.call(() => b.client.from('listings').select('category_id').eq('status', 'published'));
+    final links = await b.call(() => b.client.from('business_categories').select('category_id'));
+    final l = <String, int>{}, bz = <String, int>{};
+    for (final r in listings) {
+      l.update(r['category_id'] as String, (v) => v + 1, ifAbsent: () => 1);
+    }
+    for (final r in links) {
+      bz.update(r['category_id'] as String, (v) => v + 1, ifAbsent: () => 1);
+    }
+    return {for (final id in {...l.keys, ...bz.keys}) id: (listings: l[id] ?? 0, businesses: bz[id] ?? 0)};
+  }
 }

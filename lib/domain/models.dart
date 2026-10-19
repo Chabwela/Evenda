@@ -13,39 +13,66 @@ double? _num(dynamic v) => v == null ? null : (v as num).toDouble();
 // ---------------------------------------------------------------------------
 
 class Category {
-  const Category(this.id, this.name, this.kind, this.icon);
+  const Category(this.id, this.name, this.kind, this.icon, {this.active = true, this.sort = 100});
   final String id;
   final String name;
   final OfferingType kind;
   final String icon;
+  final bool active;
+  final int sort;
 
-  factory Category.fromRow(Map<String, dynamic> r) =>
-      Category(r['id'], r['name'], OfferingType.parse(r['kind']), r['icon'] ?? 'package');
+  factory Category.fromRow(Map<String, dynamic> r) => Category(r['id'], r['name'], OfferingType.parse(r['kind']), r['icon'] ?? 'package',
+      active: r['active'] as bool? ?? true, sort: (r['sort'] as num?)?.toInt() ?? 100);
 }
 
-/// Mirrors the categories seeded in the first migration. The database is the
-/// authority; this list is used before categories load and in demo mode.
-const kCategories = <Category>[
-  Category('tents', 'Tents & marquees', OfferingType.rental, 'tent'),
-  Category('chairs', 'Chairs', OfferingType.rental, 'armchair'),
-  Category('tables', 'Tables', OfferingType.rental, 'table'),
-  Category('linen', 'Linen & chair covers', OfferingType.rental, 'shirt'),
-  Category('decor', 'Décor & backdrops', OfferingType.rental, 'sparkles'),
-  Category('centrepieces', 'Centrepieces', OfferingType.rental, 'flower'),
-  Category('sound', 'Sound & PA', OfferingType.rental, 'speaker'),
-  Category('lighting', 'Lighting', OfferingType.rental, 'lightbulb'),
-  Category('staging', 'Staging & flooring', OfferingType.rental, 'layers'),
-  Category('catering_equip', 'Catering equipment', OfferingType.rental, 'cooking_pot'),
-  Category('styling', 'Event styling', OfferingType.service, 'palette'),
-  Category('catering', 'Catering', OfferingType.service, 'utensils'),
-  Category('florist', 'Floristry', OfferingType.service, 'flower_2'),
-  Category('photo_video', 'Photography & video', OfferingType.service, 'camera'),
-  Category('dj_mc', 'DJ & MC', OfferingType.service, 'music'),
-  Category('planning', 'Planning & coordination', OfferingType.service, 'clipboard_list'),
+/// Seeded categories (first migration), used until the live list loads and
+/// when offline. The database is the authority: [CategoryCatalog.apply]
+/// replaces this at start-up and after an admin edits categories.
+const _seedCategories = <Category>[
+  Category('tents', 'Tents & marquees', OfferingType.rental, 'tent', sort: 10),
+  Category('chairs', 'Chairs', OfferingType.rental, 'armchair', sort: 20),
+  Category('tables', 'Tables', OfferingType.rental, 'table', sort: 30),
+  Category('linen', 'Linen & chair covers', OfferingType.rental, 'shirt', sort: 40),
+  Category('decor', 'Décor & backdrops', OfferingType.rental, 'sparkles', sort: 50),
+  Category('centrepieces', 'Centrepieces', OfferingType.rental, 'flower', sort: 60),
+  Category('sound', 'Sound & PA', OfferingType.rental, 'speaker', sort: 70),
+  Category('lighting', 'Lighting', OfferingType.rental, 'lightbulb', sort: 80),
+  Category('staging', 'Staging & flooring', OfferingType.rental, 'layers', sort: 90),
+  Category('catering_equip', 'Catering equipment', OfferingType.rental, 'cooking_pot', sort: 100),
+  Category('styling', 'Event styling', OfferingType.service, 'palette', sort: 110),
+  Category('catering', 'Catering', OfferingType.service, 'utensils', sort: 120),
+  Category('florist', 'Floristry', OfferingType.service, 'flower_2', sort: 130),
+  Category('photo_video', 'Photography & video', OfferingType.service, 'camera', sort: 140),
+  Category('dj_mc', 'DJ & MC', OfferingType.service, 'music', sort: 150),
+  Category('planning', 'Planning & coordination', OfferingType.service, 'clipboard_list', sort: 160),
 ];
 
-Category categoryById(String? id) =>
-    kCategories.firstWhere((c) => c.id == id, orElse: () => const Category('other', 'Other', OfferingType.service, 'package'));
+/// Categories vendors can choose from (active only, in admin order).
+/// Mutable on purpose: screens read it when they build, so a refreshed
+/// catalogue shows up on the next build without threading a provider through
+/// every picker.
+final List<Category> kCategories = [..._seedCategories];
+final Map<String, Category> _allCategories = {for (final c in _seedCategories) c.id: c};
+
+abstract final class CategoryCatalog {
+  /// Replace the catalogue with rows from the database (active and hidden).
+  static void apply(List<Category> all) {
+    if (all.isEmpty) return;
+    _allCategories
+      ..clear()
+      ..addEntries(all.map((c) => MapEntry(c.id, c)));
+    final active = all.where((c) => c.active).toList()..sort((a, b) => a.sort.compareTo(b.sort));
+    kCategories
+      ..clear()
+      ..addAll(active);
+  }
+
+  /// Every category, including hidden ones, for the admin console.
+  static List<Category> get all => _allCategories.values.toList()..sort((a, b) => a.sort.compareTo(b.sort));
+}
+
+/// Looks up hidden categories too, so existing listings keep their name.
+Category categoryById(String? id) => _allCategories[id] ?? const Category('other', 'Other', OfferingType.service, 'package');
 
 /// Lusaka neighbourhoods with representative coordinates (approximate
 /// neighbourhood centres) used for search and location suggestions.

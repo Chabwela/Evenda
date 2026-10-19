@@ -45,6 +45,21 @@ final sessionProvider = StreamProvider<Session?>((ref) async* {
   yield* auth.sessions;
 });
 
+/// Live category catalogue. Categories are readable once signed in, so it
+/// reloads with the session and after admin edits (invalidate it). On failure
+/// the last known list stays in place.
+final categoryCatalogProvider = FutureProvider<int>((ref) async {
+  final session = ref.watch(sessionProvider).value;
+  if (session == null) return 0;
+  try {
+    final all = await ref.watch(backendProvider).discovery.categories();
+    CategoryCatalog.apply(all);
+    return all.length;
+  } catch (_) {
+    return 0;
+  }
+});
+
 /// Platform-admin role of the signed-in account, or null for vendors.
 /// Re-evaluated on every sign-in/out, so an admin reopening the app lands in
 /// the console instead of vendor onboarding.

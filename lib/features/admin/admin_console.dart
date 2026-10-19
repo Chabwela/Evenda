@@ -460,31 +460,288 @@ class _Disputes extends ConsumerWidget {
   }
 }
 
+final _categoryAdminProvider = FutureProvider.autoDispose<(List<Category>, Map<String, ({int listings, int businesses})>)>((ref) async {
+  ref.watchDomains(const [DataDomain.admin]);
+  final backend = ref.watch(backendProvider);
+  final all = await backend.discovery.categories();
+  CategoryCatalog.apply(all);
+  final usage = await backend.admin.categoryUsage();
+  return (all, usage);
+});
+
+/// Category catalogue. Categories drive what vendors can list, search and
+/// subscribe to, so each card shows real usage before anyone edits it.
 class _Categories extends ConsumerWidget {
   const _Categories();
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final api = ref.read(backendProvider).admin;
-    return ListView(children: [
-      Padding(
-        padding: const EdgeInsets.all(EvSpace.gutter),
-        child: Text('Categories drive search, broadcasts and Evenda Now matching. Changes are audited.', style: EvType.small),
-      ),
-      for (final c in kCategories)
-        EvRow(
-          dense: true,
-          leading: IconTile(categoryIcon(c.id), size: 32),
-          title: c.name,
-          subtitle: '${c.id} · ${c.kind.label}',
-          trailing: TextButton(
-            onPressed: () async {
-              final reason = await confirmWithReason(context, title: 'Update “${c.name}”', body: 'Re-save this category (for example after renaming).', required: false);
-              if (reason != null && context.mounted) await guard(context, () => api.upsertCategory(c, true, reason.isEmpty ? 'Re-saved' : reason), success: 'Saved and audited');
-            },
-            child: const Text('Edit'),
+  Widget build(BuildContext context, WidgetRef ref) => AsyncView(
+        value: ref.watch(_categoryAdminProvider),
+        onRetry: () => ref.invalidate(_categoryAdminProvider),
+        data: (data) {
+          final (all, usage) = data;
+          final active = all.where((c) => c.active).length;
+          final listings = usage.values.fold<int>(0, (s, u) => s + u.listings);
+          final unused = all.where((c) => c.active && (usage[c.id]?.businesses ?? 0) == 0 && (usage[c.id]?.listings ?? 0) == 0).length;
+          final groups = [
+            (OfferingType.rental, 'Equipment & rentals', LucideIcons.package),
+            (OfferingType.service, 'Services', LucideIcons.handHelping),
+            (OfferingType.package, 'Packages', LucideIcons.boxes),
+          ];
+          void edit(Category? c) => _editCategory(context, ref, c, all);
+
+          return ListView(padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, EvSpace.x10), children: [
+            // Summary
+            Row(children: [
+              Expanded(child: _MiniStat('Live', '$active', of: '${all.length}')),
+              const SizedBox(width: 8),
+              Expanded(child: _MiniStat('Listings', '$listings')),
+              const SizedBox(width: 8),
+              Expanded(child: _MiniStat('Unused', '$unused', tone: unused > 0 ? Tone.waiting : Tone.neutral)),
+            ]),
+            const SizedBox(height: EvSpace.x3),
+            EvButton('New category', icon: LucideIcons.plus, expand: true, onPressed: () => edit(null)),
+            const SizedBox(height: EvSpace.x2),
+            Text('Vendors pick from these when they list stock, search and subscribe to supplier updates. Hidden categories disappear from pickers; existing listings keep them.',
+                style: EvType.caption),
+            for (final (kind, title, icon) in groups)
+              if (all.any((c) => c.kind == kind)) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2),
+                  child: Row(children: [
+                    Icon(icon, size: 16, color: EvColors.forest),
+                    const SizedBox(width: 6),
+                    Text(title.toUpperCase(), style: EvType.overline.copyWith(color: EvColors.forest)),
+                    const SizedBox(width: 6),
+                    Text('${all.where((c) => c.kind == kind && c.active).length}', style: EvType.overline.copyWith(color: EvColors.bronze)),
+                  ]),
+                ),
+                for (final c in all.where((c) => c.kind == kind)) ...[
+                  _CategoryCard(category: c, usage: usage[c.id], onTap: () => edit(c)),
+                  const SizedBox(height: 8),
+                ],
+              ],
+          ]);
+        },
+      );
+}
+
+class _MiniStat extends StatelessWidget {
+  const _MiniStat(this.label, this.value, {this.of, this.tone = Tone.neutral});
+  final String label;
+  final String value;
+  final String? of;
+  final Tone tone;
+
+  @override
+  Widget build(BuildContext context) => EvSurface(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: EvType.caption),
+          Text.rich(TextSpan(children: [
+            TextSpan(text: value, style: EvType.number.copyWith(color: tone == Tone.neutral ? EvColors.ink : tone.fg)),
+            if (of != null) TextSpan(text: ' / $of', style: EvType.small),
+          ])),
+        ]),
+      );
+}
+
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({required this.category, required this.usage, required this.onTap});
+  final Category category;
+  final ({int listings, int businesses})? usage;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = category;
+    final l = usage?.listings ?? 0, b = usage?.businesses ?? 0;
+    return Opacity(
+      opacity: c.active ? 1 : 0.6,
+      child: EvSurface(
+        onTap: onTap,
+        padding: const EdgeInsets.all(12),
+        child: Row(children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: c.active ? (c.kind == OfferingType.service ? EvColors.bronzeTint : EvColors.forestTint) : EvColors.neutralTint,
+              borderRadius: EvRadius.mdAll,
+            ),
+            child: Icon(iconForCategoryKey(c.icon), size: 22, color: c.active ? (c.kind == OfferingType.service ? EvColors.bronzeDeep : EvColors.forest) : EvColors.ink3),
           ),
-        ),
-    ]);
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(c.name, style: EvType.bodyStrong, maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 2),
+              Text(
+                l == 0 && b == 0 ? 'Not used yet' : '$l listing${l == 1 ? '' : 's'} · $b business${b == 1 ? '' : 'es'}',
+                style: EvType.small.copyWith(color: l == 0 && b == 0 ? EvColors.ink3 : EvColors.ink2),
+              ),
+            ]),
+          ),
+          if (!c.active) const StatusPill('Hidden', tone: Tone.neutral, dense: true, icon: LucideIcons.eyeOff),
+          const SizedBox(width: 4),
+          const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
+        ]),
+      ),
+    );
+  }
+}
+
+Future<void> _editCategory(BuildContext context, WidgetRef ref, Category? existing, List<Category> all) async {
+  final saved = await showEvSheet<bool>(
+    context,
+    title: existing == null ? 'New category' : 'Edit category',
+    subtitle: existing == null ? 'Vendors can use it as soon as you save.' : 'Changes apply to every vendor straight away.',
+    builder: (c) => _CategoryEditor(existing: existing, all: all),
+  );
+  if (saved == true) {
+    ref.invalidate(_categoryAdminProvider);
+    ref.invalidate(categoryCatalogProvider);
+  }
+}
+
+class _CategoryEditor extends ConsumerStatefulWidget {
+  const _CategoryEditor({required this.existing, required this.all});
+  final Category? existing;
+  final List<Category> all;
+
+  @override
+  ConsumerState<_CategoryEditor> createState() => _CategoryEditorState();
+}
+
+class _CategoryEditorState extends ConsumerState<_CategoryEditor> {
+  final _form = GlobalKey<FormState>();
+  late final _name = TextEditingController(text: widget.existing?.name ?? '');
+  final _reason = TextEditingController();
+  late OfferingType _kind = widget.existing?.kind ?? OfferingType.rental;
+  late String _icon = widget.existing?.icon ?? 'package';
+  late bool _active = widget.existing?.active ?? true;
+  bool _busy = false;
+
+  bool get _isNew => widget.existing == null;
+  bool get _hiding => !_isNew && widget.existing!.active && !_active;
+
+  String _slug(String name) => name.toLowerCase().replaceAll('&', 'and').replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'^_+|_+$'), '');
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _reason.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_form.currentState!.validate()) return;
+    final id = widget.existing?.id ?? _slug(_name.text);
+    if (_isNew && widget.all.any((c) => c.id == id)) {
+      showToast(context, 'A category with this name already exists.', icon: LucideIcons.circleAlert);
+      return;
+    }
+    final sort = widget.existing?.sort ?? (widget.all.fold<int>(0, (m, c) => c.sort > m ? c.sort : m) + 10);
+    setState(() => _busy = true);
+    final ok = await guard(context, () async {
+      await ref.read(backendProvider).admin.upsertCategory(
+            Category(id, _name.text.trim(), _kind, _icon, active: _active, sort: sort),
+            _active,
+            _reason.text.trim().isEmpty ? (_isNew ? 'New category' : 'Updated') : _reason.text.trim(),
+          );
+      return true;
+    }, success: 'Saved and recorded in the audit log');
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok == true) Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, EvSpace.x6 + MediaQuery.viewInsetsOf(context).bottom),
+      child: Form(
+        key: _form,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          // Live preview of how vendors will see it.
+          EvSurface(
+            color: EvColors.cream,
+            child: Row(children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(color: _kind == OfferingType.service ? EvColors.bronzeTint : EvColors.forestTint, borderRadius: EvRadius.mdAll),
+                child: Icon(iconForCategoryKey(_icon), color: _kind == OfferingType.service ? EvColors.bronzeDeep : EvColors.forest),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ValueListenableBuilder(
+                  valueListenable: _name,
+                  builder: (_, v, _) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(v.text.trim().isEmpty ? 'Category name' : v.text.trim(), style: EvType.bodyStrong),
+                    Text(_isNew ? 'id: ${_slug(v.text).isEmpty ? '…' : _slug(v.text)}' : 'id: ${widget.existing!.id}', style: EvType.caption),
+                  ]),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: EvSpace.x4),
+          EvField(
+            label: 'Name',
+            controller: _name,
+            hint: 'e.g. Bouncy castles',
+            textCapitalization: TextCapitalization.words,
+            validator: (v) => (v == null || v.trim().length < 2 || v.trim().length > 60) ? 'Use 2–60 characters' : null,
+          ),
+          const SizedBox(height: EvSpace.x4),
+          const EvFieldLabel('Type'),
+          EvSegmented<OfferingType>(
+            value: _kind,
+            onChanged: (v) => setState(() => _kind = v),
+            segments: const [(OfferingType.rental, 'Rental'), (OfferingType.service, 'Service'), (OfferingType.package, 'Package')],
+          ),
+          const SizedBox(height: EvSpace.x4),
+          const EvFieldLabel('Icon'),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final k in kCategoryIconKeys)
+              InkWell(
+                onTap: () => setState(() => _icon = k),
+                borderRadius: EvRadius.smAll,
+                child: AnimatedContainer(
+                  duration: EvMotion.of(context, EvMotion.fast),
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: _icon == k ? EvColors.forest : EvColors.warmWhite,
+                    borderRadius: EvRadius.smAll,
+                    border: Border.all(color: _icon == k ? EvColors.forest : EvColors.sand),
+                  ),
+                  child: Icon(iconForCategoryKey(k), size: 20, color: _icon == k ? EvColors.inkOnDark : EvColors.ink2),
+                ),
+              ),
+          ]),
+          if (!_isNew) ...[
+            const SizedBox(height: EvSpace.x4),
+            EvSwitchRow(
+              title: 'Visible to vendors',
+              subtitle: _active ? 'Shown in listing, search and subscription pickers' : 'Hidden from pickers; existing listings keep it',
+              value: _active,
+              onChanged: (v) => setState(() => _active = v),
+            ),
+          ],
+          const SizedBox(height: EvSpace.x3),
+          EvField(
+            label: _hiding ? 'Reason for hiding' : 'Note for the audit log',
+            controller: _reason,
+            optional: !_hiding,
+            hint: _hiding ? 'e.g. Merged into “Décor & backdrops”' : null,
+            validator: (v) => _hiding && (v == null || v.trim().length < 5) ? 'Give a reason (at least 5 characters)' : null,
+          ),
+          const SizedBox(height: EvSpace.x5),
+          EvButton(_isNew ? 'Create category' : 'Save changes', icon: LucideIcons.check, expand: true, loading: _busy, onPressed: _save),
+        ]),
+      ),
+    );
   }
 }
 
