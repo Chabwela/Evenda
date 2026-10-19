@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Evenda cream canvas (EvColors.cream) -->
+    <color name="evenda_cream">#F7F3EA</color>
+    <color name="evenda_forest">#1B3B22</color>
+</resources>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Start-up screen: Evenda cream with the mark, matching the in-app launch screen. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/evenda_cream" />
+    <item>
+        <bitmap android:gravity="center" android:src="@drawable/launch_mark" />
+    </item>
+</layer-list>

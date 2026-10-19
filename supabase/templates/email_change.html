@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Evenda</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F7F3EA;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Confirm your new Evenda email address.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F7F3EA;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;">
+        <!-- Wordmark -->
+        <tr>
+          <td style="padding:0 4px 20px 4px;font-family:Georgia,'Times New Roman',serif;font-size:30px;font-weight:bold;color:#1B3B22;letter-spacing:0.3px;">
+            e<span style="color:#996633;">v</span>enda
+          </td>
+        </tr>
+        <!-- Card -->
+        <tr>
+          <td style="background-color:#FCFBF7;border:1px solid #E8DFCC;border-radius:16px;padding:32px 28px;font-family:Arial,Helvetica,sans-serif;color:#171A18;">
+            <p style="margin:0 0 8px 0;font-size:12px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:#1B3B22;">Email change</p>
+            <h1 style="margin:0 0 16px 0;font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:1.25;font-weight:bold;color:#171A18;">Confirm your new email</h1>
+            <p style="margin:0 0 24px 0;font-size:16px;line-height:1.55;color:#4A4F4B;">You asked to change the email on your Evenda account to {{ .NewEmail }}. Enter this code in the app to confirm.</p>
+            <!-- Code -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" style="background-color:#EFF3EC;border:1px solid #E2EADF;border-radius:12px;padding:20px 12px;">
+                  <p style="margin:0 0 6px 0;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#767B76;">Your code</p>
+                  <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:36px;font-weight:bold;letter-spacing:10px;color:#1B3B22;">{{ .Token }}</p>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:24px 0 0 0;font-size:15px;line-height:1.55;color:#4A4F4B;">The code expires in 1 hour.</p>
+            <p style="margin:24px 0 0 0;padding-top:20px;border-top:1px solid #E8DFCC;font-size:13px;line-height:1.5;color:#767B76;">Didn’t ask for this change? Ignore this email and your account email stays the same.</p>
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 4px 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#767B76;">
+            Evenda — the vendor-to-vendor marketplace for Zambia’s event trade.<br>
+            By DanTech Solutions Group, Lusaka.
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

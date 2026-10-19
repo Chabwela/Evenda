@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification sounds are referenced by name from channels and push payloads; keep them in release builds. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@raw/evenda_chime,@raw/evenda_urgent" />

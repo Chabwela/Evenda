@@ -1,0 +1,69 @@
+name: evenda
+description: "Evenda — vendor-to-vendor marketplace and event operations for Zambia. By DanTech Solutions Group."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  cached_network_image: ^3.4.1
+  collection: ^1.19.1
+  connectivity_plus: ^7.3.1
+  firebase_core: ^5.0.0
+  firebase_messaging: ^17.0.0
+  flutter:
+    sdk: flutter
+  flutter_map: ^8.3.2
+  flutter_riverpod: ^3.4.3
+  flutter_svg: ^2.3.0
+  geolocator: ^14.1.1
+  go_router: ^17.5.0
+  image_picker: ^1.2.4
+  intl: ^0.20.3
+  latlong2: ^0.10.1
+  lucide_icons_flutter: ^4.0.0
+  pdf: ^3.13.1
+  printing: ^5.15.1
+  share_plus: ^13.3.1
+  shared_preferences: ^2.5.6
+  supabase_flutter: ^2.18.3
+  url_launcher: ^6.3.3
+  uuid: ^4.6.0
+
+dev_dependencies:
+  flutter_launcher_icons: ^0.14.2
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  mocktail: ^1.0.5
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/brand/
+    - assets/illustrations/
+    - assets/images/
+  fonts:
+    - family: Figtree
+      fonts:
+        - asset: assets/fonts/Figtree.ttf
+    - family: Fraunces
+      fonts:
+        - asset: assets/fonts/Fraunces.ttf
+
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  remove_alpha_ios: true
+  adaptive_icon_background: "assets/icon/app_icon_background.png"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  adaptive_icon_monochrome: "assets/icon/app_icon_monochrome.png"
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+    background_color: "#1B3B22"
+    theme_color: "#1B3B22"
