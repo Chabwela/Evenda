@@ -71,14 +71,20 @@ class _AdminConsoleScreenState extends ConsumerState<AdminConsoleScreen> {
 
     final header = AppBar(
       backgroundColor: EvColors.cream,
-      title: Row(children: [
-        Text(_s.label),
-      ]),
+      // Left-aligned: centred, the title only had the gap between the menu
+      // button and the role badge.
+      centerTitle: false,
+      titleSpacing: 0,
+      // Long section names ("Bookings & payments") ran into the role badge.
+      title: Text(_s.label, maxLines: 1, overflow: TextOverflow.ellipsis),
       actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: Center(child: StatusPill(session.role.label, tone: Tone.progress, icon: LucideIcons.shieldCheck, dense: true)),
-        ),
+        // On phones the role badge lives in the drawer, so long section
+        // titles ("Bookings & payments") fit.
+        if (wide)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Center(child: StatusPill(session.role.label, tone: Tone.progress, icon: LucideIcons.shieldCheck, dense: true)),
+          ),
         IconButton(
           tooltip: 'Sign out',
           icon: const Icon(LucideIcons.logOut),
@@ -116,7 +122,14 @@ class _AdminConsoleScreenState extends ConsumerState<AdminConsoleScreen> {
         backgroundColor: EvColors.warmWhite,
         child: SafeArea(
           child: ListView(children: [
-            const Padding(padding: EdgeInsets.all(EvSpace.gutter), child: EvendaLogo(size: 26)),
+            Padding(
+              padding: const EdgeInsets.all(EvSpace.gutter),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const EvendaLogo(size: 26),
+                const SizedBox(height: EvSpace.x3),
+                StatusPill(session.role.label, tone: Tone.progress, icon: LucideIcons.shieldCheck, dense: true),
+              ]),
+            ),
             for (final s in sections)
               ListTile(
                 leading: Icon(s.icon, color: s == _s ? EvColors.forest : EvColors.ink2),
@@ -159,12 +172,18 @@ class _Overview extends ConsumerWidget {
       value: stats,
       onRetry: () => ref.invalidate(_statsProvider),
       data: (m) {
+        // Two columns on a phone, more on wider screens (a fixed 180 px left
+        // half of a phone screen empty). Measured, so the tablet rail counts.
+        return LayoutBuilder(builder: (context, box) {
+        final avail = box.maxWidth - 2 * EvSpace.gutter;
+        final cols = ((avail + 10) / 190).floor().clamp(2, 6);
+        final tileWidth = (avail - 10 * (cols - 1)) / cols;
         Widget tile(String label, int v, {Tone tone = Tone.neutral, _Section? open}) => SizedBox(
-              width: 180,
+              width: tileWidth,
               child: EvSurface(
                 onTap: open != null && role.can(open.permission) ? () => onOpen(open) : null,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(label, style: EvType.caption),
+                  Text(label, style: EvType.caption, maxLines: 2, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 6),
                   EvAnimatedCount(value: v, style: EvType.number.copyWith(color: tone == Tone.neutral ? EvColors.ink : tone.fg)),
                 ]),
@@ -190,6 +209,7 @@ class _Overview extends ConsumerWidget {
             tile('Live Evenda Now', m['now_open'] ?? 0, tone: Tone.progress, open: _Section.now),
           ]),
         ]);
+        });
       },
     );
   }
