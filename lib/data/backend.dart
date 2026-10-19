@@ -235,6 +235,9 @@ abstract class AdminApi {
   Future<void> moderateListing(String listingId, ModerationStatus status, String reason);
   Future<List<NowRequest>> nowRequests();
   Future<List<Booking>> recentBookings();
+
+  /// Cancel a booking as Evenda (reason required, audited, both parties told).
+  Future<void> cancelBooking(String bookingId, String reason);
   Future<List<Dispute>> disputes();
   Future<void> resolveDispute(String disputeId, String status, String resolution);
   Future<List<AuditEntry>> auditLog();

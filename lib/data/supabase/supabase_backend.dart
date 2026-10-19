@@ -1264,6 +1264,12 @@ class _SbAdmin implements AdminApi {
   }
 
   @override
+  Future<void> cancelBooking(String bookingId, String reason) async {
+    await b.rpc('admin_cancel_booking', {'p_booking': bookingId, 'p_reason': reason});
+    b.touch({DataDomain.admin, DataDomain.bookings});
+  }
+
+  @override
   Future<Map<String, int>> stats() async {
     final m = await b.rpc('admin_platform_stats') as Map<String, dynamic>;
     return m.map((k, v) => MapEntry(k, (v as num).toInt()));

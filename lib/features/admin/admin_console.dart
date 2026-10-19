@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/providers.dart';
 import '../../core/format.dart';
@@ -375,48 +376,397 @@ class _NowMonitor extends ConsumerWidget {
       );
 }
 
-class _Bookings extends ConsumerWidget {
+enum _BookingFilter {
+  all('All'),
+  active('Active'),
+  unpaid('Payment due'),
+  disputed('Disputed'),
+  completed('Completed'),
+  cancelled('Cancelled');
+
+  const _BookingFilter(this.label);
+  final String label;
+
+  bool matches(Booking b) => switch (this) {
+        all => true,
+        active => !{BookingStatus.completed, BookingStatus.cancelled, BookingStatus.disputed}.contains(b.status),
+        unpaid => b.status != BookingStatus.cancelled && b.confirmedPaid < b.total,
+        disputed => b.status == BookingStatus.disputed,
+        completed => b.status == BookingStatus.completed,
+        cancelled => b.status == BookingStatus.cancelled,
+      };
+}
+
+/// Platform-wide booking oversight: money moving between vendors, what is
+/// owed, what is contested, and the power to step in.
+class _Bookings extends ConsumerStatefulWidget {
   const _Bookings({required this.showPayments});
   final bool showPayments;
   @override
-  Widget build(BuildContext context, WidgetRef ref) => AsyncView(
+  ConsumerState<_Bookings> createState() => _BookingsState();
+}
+
+class _BookingsState extends ConsumerState<_Bookings> {
+  _BookingFilter _filter = _BookingFilter.all;
+
+  @override
+  Widget build(BuildContext context) => AsyncView(
         value: ref.watch(_bookingsProvider),
         onRetry: () => ref.invalidate(_bookingsProvider),
         isEmpty: (l) => l.isEmpty,
-        empty: const EmptyState(title: 'No bookings yet', compact: true),
-        data: (list) => ListView.separated(
-          itemCount: list.length,
-          separatorBuilder: (_, _) => const EvDivider(indent: EvSpace.gutter),
-          itemBuilder: (c, i) {
-            final b = list[i];
-            return ExpansionTile(
-              tilePadding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
-              shape: const Border(),
-              title: Text('${b.reference} · ${b.supplier.name}', style: EvType.bodyStrong),
-              subtitle: Text('Hired by ${b.requester.name} · ${EvDates.range(b.startsOn, b.endsOn)} · ${Money.k(b.total)}', style: EvType.small),
-              trailing: StatusPill(b.status.label, tone: toneForBooking(b.status), dense: true),
-              children: [
-                if (showPayments)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, EvSpace.x3),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [StatusPill(b.paymentStatus.label, tone: toneForPayment(b.paymentStatus), dense: true), const SizedBox(width: 8), Text('${Money.k(b.confirmedPaid)} confirmed', style: EvType.small)]),
-                      for (final p in b.payments)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text('${Money.k(p.amount)} ${p.kind} · ${p.methodLabel}${p.reference != null ? ' · ${p.reference}' : ''} · ${p.confirmedAt != null ? 'confirmed' : 'unconfirmed'}',
-                              style: EvType.caption),
+        empty: const EmptyState(mascot: Mascot.chair, title: 'No bookings yet', body: 'Bookings between vendors appear here with their payments.', compact: true),
+        data: (all) {
+          final live = all.where((b) => b.status != BookingStatus.cancelled).toList();
+          final value = live.fold<double>(0, (s, b) => s + b.total);
+          // Per booking, so an overpayment on one never hides money owed on another.
+          final paid = live.fold<double>(0, (s, b) => s + (b.confirmedPaid < b.total ? b.confirmedPaid : b.total));
+          final owed = live.fold<double>(0, (s, b) => s + (b.total - b.confirmedPaid).clamp(0, double.infinity));
+          final overpaid = live.where((b) => b.confirmedPaid > b.total + 0.005).toList();
+          final disputed = all.where((b) => b.status == BookingStatus.disputed).length;
+          final unconfirmed = all.expand((b) => b.payments).where((p) => p.confirmedAt == null).length;
+          final list = all.where(_filter.matches).toList();
+
+          return ListView(padding: const EdgeInsets.only(bottom: EvSpace.x10), children: [
+            // Money overview, the platform's ledger at a glance.
+            Container(
+              margin: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, 0),
+              padding: const EdgeInsets.all(EvSpace.x4),
+              decoration: BoxDecoration(color: EvColors.forest, borderRadius: EvRadius.lgAll),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('BOOKED VALUE ON EVENDA', style: EvType.overline.copyWith(color: EvColors.sand)),
+                const SizedBox(height: 4),
+                Text(Money.zmw(value), style: EvType.display.copyWith(color: EvColors.inkOnDark)),
+                Text('${live.length} live booking${live.length == 1 ? '' : 's'} · cancelled excluded', style: EvType.caption.copyWith(color: EvColors.sand)),
+                if (widget.showPayments) ...[
+                  const SizedBox(height: EvSpace.x3),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: value == 0 ? 0 : paid / value,
+                      minHeight: 8,
+                      backgroundColor: EvColors.forestSoft,
+                      color: const Color(0xFFC9A27A),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    Expanded(child: _MoneyFact('Confirmed paid', Money.k(paid), const Color(0xFFC9A27A))),
+                    Expanded(child: _MoneyFact('Still owed', Money.k(owed), EvColors.inkOnDark)),
+                  ]),
+                  if (overpaid.isNotEmpty) ...[
+                    const SizedBox(height: EvSpace.x3),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: EvColors.dangerTint, borderRadius: EvRadius.mdAll),
+                      child: Row(children: [
+                        const Icon(LucideIcons.triangleAlert, size: 18, color: EvColors.danger),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${overpaid.length} booking${overpaid.length == 1 ? ' has' : 's have'} more confirmed than the booking total (${overpaid.map((b) => b.reference).join(', ')}). Check for a typing error.',
+                            style: EvType.small.copyWith(color: EvColors.danger),
+                          ),
                         ),
-                      if (b.payments.isEmpty) Text('No payment records.', style: EvType.caption),
-                    ]),
-                  )
-                else
-                  Padding(padding: const EdgeInsets.all(EvSpace.gutter), child: Text('Payment records need the finance role.', style: EvType.caption)),
-              ],
-            );
-          },
-        ),
+                      ]),
+                    ),
+                  ],
+                ],
+              ]),
+            ),
+            const SizedBox(height: EvSpace.x3),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
+              child: Row(children: [
+                Expanded(child: _MiniStat('Disputed', '$disputed', tone: disputed > 0 ? Tone.critical : Tone.neutral)),
+                const SizedBox(width: 8),
+                Expanded(child: _MiniStat('Unconfirmed payments', '$unconfirmed', tone: unconfirmed > 0 ? Tone.waiting : Tone.neutral)),
+              ]),
+            ),
+            const SizedBox(height: EvSpace.x3),
+            EvSegmented<_BookingFilter>(
+              value: _filter,
+              onChanged: (v) => setState(() => _filter = v),
+              segments: [for (final f in _BookingFilter.values) (f, '${f.label} ${all.where(f.matches).length}')],
+            ),
+            const SizedBox(height: EvSpace.x2),
+            if (list.isEmpty)
+              const EmptyState(title: 'Nothing here', body: 'No bookings match this filter.', compact: true)
+            else
+              for (final b in list)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, 8),
+                  child: _AdminBookingCard(booking: b, showPayments: widget.showPayments, onTap: () => _openBookingFile(context, ref, b, widget.showPayments)),
+                ),
+          ]);
+        },
       );
+}
+
+class _MoneyFact extends StatelessWidget {
+  const _MoneyFact(this.label, this.value, this.color);
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: EvType.caption.copyWith(color: EvColors.sand)),
+        Text(value, style: EvType.money.copyWith(color: color, fontSize: 17)),
+      ]);
+}
+
+class _AdminBookingCard extends StatelessWidget {
+  const _AdminBookingCard({required this.booking, required this.showPayments, required this.onTap});
+  final Booking booking;
+  final bool showPayments;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final b = booking;
+    final ratio = b.total == 0 ? 0.0 : (b.confirmedPaid / b.total).clamp(0.0, 1.0);
+    final overpaid = b.confirmedPaid > b.total + 0.005;
+    final alert = b.status == BookingStatus.disputed || overpaid;
+    return EvSurface(
+      onTap: onTap,
+      padding: EdgeInsets.zero,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: EvRadius.lgAll,
+          border: alert ? const Border(left: BorderSide(color: EvColors.danger, width: 4)) : null,
+        ),
+        padding: const EdgeInsets.all(EvSpace.x3),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text(b.reference, style: EvType.smallStrong.copyWith(fontFamily: 'monospace', letterSpacing: 0.5, color: EvColors.ink2)),
+            if (b.source == BookingSource.now) ...[
+              const SizedBox(width: 6),
+              const StatusPill('Evenda Now', tone: Tone.attention, dense: true, icon: LucideIcons.zap),
+            ],
+            const Spacer(),
+            StatusPill(b.status.label, tone: toneForBooking(b.status), dense: true),
+          ]),
+          const SizedBox(height: EvSpace.x3),
+          // Who supplies whom.
+          Row(children: [
+            Expanded(child: _Party(b.supplier, 'Supplier')),
+            const Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Icon(LucideIcons.arrowRight, size: 16, color: EvColors.ink3)),
+            Expanded(child: _Party(b.requester, 'Hired by')),
+          ]),
+          const SizedBox(height: EvSpace.x3),
+          Row(children: [
+            const Icon(LucideIcons.calendarDays, size: 14, color: EvColors.ink3),
+            const SizedBox(width: 6),
+            Expanded(child: Text(EvDates.range(b.startsOn, b.endsOn), style: EvType.small)),
+            Text(Money.k(b.total), style: EvType.money),
+          ]),
+          if (showPayments) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 5,
+                backgroundColor: EvColors.sand,
+                color: overpaid ? EvColors.danger : (ratio >= 1 ? EvColors.success : EvColors.bronze),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(children: [
+              Text('${Money.k(b.confirmedPaid)} confirmed', style: EvType.caption.copyWith(color: overpaid ? EvColors.danger : null, fontWeight: overpaid ? FontWeight.w700 : null)),
+              const Spacer(),
+              overpaid
+                  ? Text('Overpaid by ${Money.k(b.confirmedPaid - b.total)}', style: EvType.caption.copyWith(color: EvColors.danger, fontWeight: FontWeight.w700))
+                  : Text(b.paymentStatus.label, style: EvType.caption.copyWith(color: toneForPayment(b.paymentStatus).fg, fontWeight: FontWeight.w700)),
+            ]),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
+class _Party extends StatelessWidget {
+  const _Party(this.biz, this.role);
+  final BizRef biz;
+  final String role;
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        BusinessAvatar(name: biz.name, logoUrl: biz.logoUrl, size: 30, verified: biz.verified),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(role, style: EvType.caption),
+            Text(biz.name, style: EvType.smallStrong, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ]),
+        ),
+      ]);
+}
+
+void _openBookingFile(BuildContext context, WidgetRef ref, Booking b, bool showPayments) {
+  showEvSheet<void>(
+    context,
+    title: 'Booking ${b.reference}',
+    subtitle: '${b.source == BookingSource.now ? 'Evenda Now' : b.source == BookingSource.quotation ? 'From a quotation' : 'Manual'} · created ${EvDates.day(b.createdAt)}',
+    builder: (c) => _BookingFile(booking: b, showPayments: showPayments, onChanged: () => ref.invalidate(_bookingsProvider)),
+  );
+}
+
+class _BookingFile extends ConsumerWidget {
+  const _BookingFile({required this.booking, required this.showPayments, required this.onChanged});
+  final Booking booking;
+  final bool showPayments;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final b = booking;
+    final role = ref.watch(adminSessionProvider).value?.role ?? ref.read(backendProvider).admin.current?.role;
+    final canIntervene = (role?.can('dispute.manage') ?? false) && b.status != BookingStatus.completed && b.status != BookingStatus.cancelled;
+    String who(String id) => id == b.supplier.id ? b.supplier.name : id == b.requester.id ? b.requester.name : 'Unknown';
+
+    Widget party(BizRef p, String label) => EvSurface(
+          padding: const EdgeInsets.all(12),
+          child: Row(children: [
+            BusinessAvatar(name: p.name, logoUrl: p.logoUrl, size: 40, verified: p.verified),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(label, style: EvType.caption),
+                Text(p.name, style: EvType.bodyStrong, maxLines: 1, overflow: TextOverflow.ellipsis),
+                if (p.neighbourhood != null) Text(p.neighbourhood!, style: EvType.caption),
+              ]),
+            ),
+            if (p.phone != null) EvIconButton(LucideIcons.phone, tooltip: 'Call', onPressed: () => launchUrl(Uri.parse('tel:${p.phone}'))),
+            if (p.whatsapp != null)
+              EvIconButton(LucideIcons.messageCircle,
+                  tooltip: 'WhatsApp',
+                  onPressed: () => launchUrl(Uri.parse('https://wa.me/${ZambianPhone.waDigits(p.whatsapp!)}?text=${Uri.encodeComponent('Hello from the Evenda team about booking ${b.reference}.')}'),
+                      mode: LaunchMode.externalApplication)),
+            EvIconButton(LucideIcons.store, tooltip: 'Review business', onPressed: () {
+              Navigator.pop(context);
+              context.push('/admin/business/${p.id}');
+            }),
+          ]),
+        );
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, EvSpace.x8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          StatusPill(b.status.label, tone: toneForBooking(b.status)),
+          StatusPill(b.paymentStatus.label, tone: toneForPayment(b.paymentStatus), icon: LucideIcons.wallet),
+          StatusPill(b.fulfilment.label, tone: Tone.neutral, icon: LucideIcons.truck),
+        ]),
+        const SizedBox(height: EvSpace.x3),
+        party(b.supplier, 'Supplier'),
+        const SizedBox(height: 8),
+        party(b.requester, 'Hired by'),
+
+        const SectionHeader('What was booked', padding: EdgeInsets.fromLTRB(0, EvSpace.x5, 0, EvSpace.x2)),
+        EvSurface(
+          child: Column(children: [
+            for (final i in b.items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(children: [
+                  Expanded(child: Text('${i.quantity} × ${i.description}', style: EvType.body)),
+                  Text(Money.k(i.lineTotal), style: EvType.money),
+                ]),
+              ),
+            const EvDivider(),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: Text(EvDates.range(b.startsOn, b.endsOn), style: EvType.small)),
+              Text('Total ${Money.zmw(b.total)}', style: EvType.money),
+            ]),
+            if (b.depositAmount > 0)
+              Align(alignment: Alignment.centerRight, child: Text('Deposit ${Money.k(b.depositAmount)}', style: EvType.caption)),
+          ]),
+        ),
+
+        SectionHeader('Payment ledger', count: showPayments ? b.payments.length : null, padding: const EdgeInsets.fromLTRB(0, EvSpace.x5, 0, EvSpace.x2)),
+        if (!showPayments)
+          Text('Payment records need the finance or super admin role.', style: EvType.small)
+        else if (b.payments.isEmpty)
+          EvSurface(color: EvColors.warningTint, child: Text('No payments recorded yet. Evenda records payments; it does not hold money.', style: EvType.small.copyWith(color: EvColors.warning)))
+        else
+          for (final p in b.payments)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: EvSurface(
+                padding: const EdgeInsets.all(12),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(p.kind == 'refund' ? LucideIcons.undo2 : LucideIcons.banknote, size: 20, color: p.confirmedAt != null ? EvColors.success : EvColors.warning),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('${p.kind[0].toUpperCase()}${p.kind.substring(1)} · ${p.methodLabel}', style: EvType.smallStrong),
+                      Text('Recorded by ${who(p.recordedByBusinessId)} · ${EvDates.dayTime(p.createdAt)}', style: EvType.caption),
+                      if (p.reference != null) Text('Ref ${p.reference}', style: EvType.caption.copyWith(fontFamily: 'monospace')),
+                      const SizedBox(height: 4),
+                      p.confirmedAt != null
+                          ? StatusPill('Confirmed by the other party', tone: Tone.positive, dense: true, icon: LucideIcons.check)
+                          : const StatusPill('Not confirmed', tone: Tone.waiting, dense: true),
+                    ]),
+                  ),
+                  Text('${p.kind == 'refund' ? '−' : ''}${Money.k(p.amount)}', style: EvType.money),
+                ]),
+              ),
+            ),
+
+        SectionHeader('Timeline', count: b.history.length, padding: const EdgeInsets.fromLTRB(0, EvSpace.x5, 0, EvSpace.x2)),
+        for (final (i, h) in b.history.reversed.indexed)
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Column(children: [
+              Container(width: 10, height: 10, margin: const EdgeInsets.only(top: 4), decoration: BoxDecoration(color: toneForBooking(h.to).fg, shape: BoxShape.circle)),
+              if (i < b.history.length - 1) Container(width: 2, height: 34, color: EvColors.sand),
+            ]),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(h.to.label, style: EvType.smallStrong),
+                  Text([EvDates.dayTime(h.at), if (h.note != null && h.note!.isNotEmpty) h.note!].join(' · '), style: EvType.caption),
+                ]),
+              ),
+            ),
+          ]),
+
+        if (canIntervene) ...[
+          const SizedBox(height: EvSpace.x4),
+          EvSurface(
+            color: EvColors.dangerTint,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [
+                const Icon(LucideIcons.shieldAlert, size: 18, color: EvColors.danger),
+                const SizedBox(width: 8),
+                Text('Platform intervention', style: EvType.smallStrong.copyWith(color: EvColors.danger)),
+              ]),
+              const SizedBox(height: 6),
+              Text('Cancelling releases the reserved stock and open tasks, and notifies both businesses with your reason.', style: EvType.small),
+              const SizedBox(height: EvSpace.x3),
+              EvButton('Cancel booking as Evenda', kind: EvButtonKind.danger, icon: LucideIcons.ban, expand: true, onPressed: () async {
+                final reason = await confirmWithReason(context,
+                    title: 'Cancel ${b.reference}?', body: 'Both businesses see this reason. It is stored in the audit log.', confirm: 'Cancel booking', destructive: true);
+                if (reason == null || !context.mounted) return;
+                final ok = await guard(context, () async {
+                  await ref.read(backendProvider).admin.cancelBooking(b.id, reason);
+                  return true;
+                }, success: 'Booking cancelled and both parties notified');
+                if (ok == true && context.mounted) {
+                  onChanged();
+                  Navigator.pop(context);
+                }
+              }),
+            ]),
+          ),
+        ],
+      ]),
+    );
+  }
 }
 
 class _Disputes extends ConsumerWidget {
