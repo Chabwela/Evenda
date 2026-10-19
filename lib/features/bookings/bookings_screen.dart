@@ -153,14 +153,15 @@ class RequestRow extends StatelessWidget {
       leading: BusinessAvatar(name: other.name, logoUrl: other.logoUrl, verified: other.verified),
       title: other.name,
       subtitle: q.items.map((i) => '${i.quantity} × ${i.description}').join(', '),
-      meta: Row(children: [
-        Icon(incoming ? LucideIcons.arrowDownLeft : LucideIcons.arrowUpRight, size: 13, color: EvColors.ink3),
-        const SizedBox(width: 4),
-        Text('${incoming ? 'To you' : 'You asked'} · ${EvDates.range(q.neededFrom, q.neededTo)}', style: EvType.caption),
-        if (waitingOnMe) ...[
-          const SizedBox(width: 8),
-          Text('Your move', style: EvType.caption.copyWith(color: EvColors.bronzeDeep, fontWeight: FontWeight.w700)),
-        ],
+      // Wraps instead of overflowing: next to the status pill there is
+      // little room for direction, dates and "Your move" on one line.
+      meta: Wrap(spacing: 8, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(incoming ? LucideIcons.arrowDownLeft : LucideIcons.arrowUpRight, size: 13, color: EvColors.ink3),
+          const SizedBox(width: 4),
+          Text('${incoming ? 'To you' : 'You asked'} · ${EvDates.range(q.neededFrom, q.neededTo)}', style: EvType.caption),
+        ]),
+        if (waitingOnMe) Text('Your move', style: EvType.caption.copyWith(color: EvColors.bronzeDeep, fontWeight: FontWeight.w700)),
       ]),
       trailing: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
         StatusPill(q.status.label, tone: toneForRequest(q.status), dense: true),

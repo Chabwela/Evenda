@@ -89,10 +89,12 @@ class ListingResultCard extends StatelessWidget {
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           EvPhoto(l.coverPhoto, width: 112, height: 112, icon: categoryIcon(l.categoryId)),
           const SizedBox(width: EvSpace.x3),
+          // At least as tall as the photo, but free to grow: a two-line title
+          // or a large phone text size overflowed the old fixed 112 px.
           Expanded(
-            child: SizedBox(
-              height: 112,
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 112),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                 Text(categoryById(l.categoryId).name.toUpperCase(), style: EvType.overline.copyWith(fontSize: 10)),
                 const SizedBox(height: 2),
                 Text(l.title, style: EvType.headline.copyWith(fontSize: 16), maxLines: 2, overflow: TextOverflow.ellipsis),
@@ -102,9 +104,10 @@ class ListingResultCard extends StatelessWidget {
                     Flexible(child: Text(biz.name, style: EvType.small, maxLines: 1, overflow: TextOverflow.ellipsis)),
                     if (biz.verified) ...[const SizedBox(width: 4), const Icon(LucideIcons.badgeCheck, size: 13, color: EvColors.forest)],
                   ]),
-                const Spacer(),
+                const SizedBox(height: 8),
                 Row(children: [
-                  Expanded(child: Text(priceLabel(l), style: EvType.money.copyWith(fontSize: 14))),
+                  Expanded(child: Text(priceLabel(l), style: EvType.money.copyWith(fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  const SizedBox(width: 6),
                   if (result.available != null)
                     StatusPill('${result.available} free', tone: Tone.positive, dense: true)
                   else if (l.tracksStock && l.kind != OfferingType.service)
@@ -117,6 +120,8 @@ class ListingResultCard extends StatelessWidget {
                     if (result.distanceKm != null) '${result.distanceKm!.toStringAsFixed(1)} km',
                   ].join(' · '),
                   style: EvType.caption,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ]),
             ),
