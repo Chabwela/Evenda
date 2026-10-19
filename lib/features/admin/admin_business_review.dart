@@ -94,7 +94,10 @@ class _Body extends ConsumerWidget {
         padding: EdgeInsets.zero,
         child: Column(children: [
           _Fact(LucideIcons.user, 'Owner', '${owner['name'] ?? ''}'.isEmpty ? '—' : owner['name']),
-          _Fact(LucideIcons.atSign, 'Account email', '${owner['email'] ?? '—'}${owner['email_confirmed'] == true ? '  ✓ confirmed' : ''}'),
+          _Fact(LucideIcons.atSign, 'Account email', '${owner['email'] ?? '—'}',
+              badge: owner['email_confirmed'] == true
+                  ? const StatusPill('Confirmed', tone: Tone.positive, dense: true, icon: LucideIcons.check)
+                  : const StatusPill('Not confirmed', tone: Tone.waiting, dense: true)),
           if (owner['joined_at'] != null) _Fact(LucideIcons.calendarClock, 'Joined', EvDates.day(DateTime.parse(owner['joined_at']).toLocal())),
           _Fact(LucideIcons.phone, 'Business phone', ZambianPhone.display(d.phone).isEmpty ? '—' : ZambianPhone.display(d.phone),
               action: d.phone == null ? null : () => launchUrl(Uri.parse('tel:${d.phone}'))),
@@ -344,29 +347,79 @@ class _DecisionBar extends ConsumerWidget {
       if (ok == true) onChanged();
     }
 
+    final accepted = d.documents.where((x) => x.status == 'accepted').length;
+    final total = d.documents.length;
+    final canVerify = !verified && d.hasAcceptedDocument;
+    final (stateText, stateTone) = switch (d.verification) {
+      VerificationStatus.verified => ('Verified business', Tone.positive),
+      VerificationStatus.rejected => ('Verification rejected', Tone.critical),
+      VerificationStatus.pending => ('Waiting for your decision', Tone.waiting),
+      VerificationStatus.unverified => ('Not submitted for verification', Tone.neutral),
+    };
+
     return Container(
-      decoration: const BoxDecoration(color: EvColors.warmWhite, border: Border(top: BorderSide(color: EvColors.sand))),
+      decoration: BoxDecoration(
+        color: EvColors.warmWhite,
+        border: const Border(top: BorderSide(color: EvColors.sand)),
+        boxShadow: [BoxShadow(color: EvColors.ink.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, -4))],
+      ),
       padding: EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, EvSpace.x3 + MediaQuery.paddingOf(context).bottom),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (!verified && !d.hasAcceptedDocument)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text('Open and accept at least one document to enable Verify.', style: EvType.caption, textAlign: TextAlign.center),
-          ),
+        // Where the review stands.
         Row(children: [
-          Expanded(
-            child: EvButton(suspended ? 'Reactivate' : 'Suspend', kind: suspended ? EvButtonKind.secondary : EvButtonKind.quiet,
-                icon: suspended ? LucideIcons.rotateCcw : LucideIcons.ban, expand: true, onPressed: setStatus),
-          ),
+          Icon(verified ? LucideIcons.badgeCheck : LucideIcons.shieldQuestion, size: 18, color: stateTone == Tone.neutral ? EvColors.ink2 : stateTone.fg),
           const SizedBox(width: 8),
-          if (d.verification != VerificationStatus.rejected)
+          Expanded(child: Text(stateText, style: EvType.smallStrong)),
+          if (suspended) const StatusPill('Suspended', tone: Tone.critical, dense: true),
+        ]),
+        if (total > 0) ...[
+          const SizedBox(height: 8),
+          Row(children: [
             Expanded(
-              child: EvButton('Reject', kind: EvButtonKind.secondary, expand: true, onPressed: () => setVerification(VerificationStatus.rejected)),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: accepted / total,
+                  minHeight: 6,
+                  backgroundColor: EvColors.sand,
+                  color: accepted > 0 ? EvColors.success : EvColors.sandDeep,
+                ),
+              ),
             ),
-          if (d.verification != VerificationStatus.rejected) const SizedBox(width: 8),
+            const SizedBox(width: 10),
+            Text('$accepted of $total document${total == 1 ? '' : 's'} accepted', style: EvType.caption),
+          ]),
+        ],
+        const SizedBox(height: EvSpace.x3),
+
+        // The decision. Locked until a document has been accepted.
+        if (!verified)
+          EvButton(
+            canVerify ? 'Verify business' : (total == 0 ? 'No documents to review' : 'Accept a document to unlock'),
+            icon: canVerify ? LucideIcons.badgeCheck : LucideIcons.lock,
+            expand: true,
+            onPressed: canVerify ? () => setVerification(VerificationStatus.verified) : null,
+          ),
+        if (!verified) const SizedBox(height: 8),
+        Row(children: [
+          if (d.verification != VerificationStatus.rejected) ...[
+            Expanded(
+              child: _OutlineAction(
+                label: verified ? 'Revoke verification' : 'Reject verification',
+                icon: LucideIcons.circleX,
+                color: EvColors.danger,
+                onTap: () => setVerification(VerificationStatus.rejected),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           Expanded(
-            child: EvButton(verified ? 'Verified' : 'Verify', icon: LucideIcons.badgeCheck, expand: true,
-                onPressed: verified || !d.hasAcceptedDocument ? null : () => setVerification(VerificationStatus.verified)),
+            child: _OutlineAction(
+              label: suspended ? 'Reactivate account' : 'Suspend account',
+              icon: suspended ? LucideIcons.rotateCcw : LucideIcons.ban,
+              color: suspended ? EvColors.forest : EvColors.warning,
+              onTap: setStatus,
+            ),
           ),
         ]),
       ]),
@@ -374,12 +427,41 @@ class _DecisionBar extends ConsumerWidget {
   }
 }
 
+/// Secondary decision: outlined, coloured by consequence, full label.
+class _OutlineAction extends StatelessWidget {
+  const _OutlineAction({required this.label, required this.icon, required this.color, required this.onTap});
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: EvRadius.mdAll,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 46),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            decoration: BoxDecoration(borderRadius: EvRadius.mdAll, border: Border.all(color: color.withValues(alpha: 0.45), width: 1.4)),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Flexible(child: Text(label, style: EvType.smallStrong.copyWith(color: color), textAlign: TextAlign.center, maxLines: 2)),
+            ]),
+          ),
+        ),
+      );
+}
+
 class _Fact extends StatelessWidget {
-  const _Fact(this.icon, this.label, this.value, {this.action});
+  const _Fact(this.icon, this.label, this.value, {this.action, this.badge});
   final IconData icon;
   final String label;
   final String value;
   final VoidCallback? action;
+  final Widget? badge;
 
   @override
   Widget build(BuildContext context) => InkWell(
@@ -393,6 +475,7 @@ class _Fact extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(label, style: EvType.caption),
                 Text(value, style: EvType.body),
+                if (badge != null) Padding(padding: const EdgeInsets.only(top: 4), child: badge),
               ]),
             ),
             if (action != null) const Icon(LucideIcons.externalLink, size: 16, color: EvColors.forest),
@@ -415,7 +498,8 @@ class _Count extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label, style: EvType.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
             Text(value, style: EvType.number.copyWith(color: alert ? EvColors.danger : EvColors.ink)),
-            if (sub != null) Text(sub!, style: EvType.caption),
+            // Always reserve the sub line so every card in the grid is the same height.
+            Text(sub ?? ' ', style: EvType.caption),
           ]),
         ),
       );
