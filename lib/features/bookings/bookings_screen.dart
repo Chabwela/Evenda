@@ -159,7 +159,8 @@ class RequestRow extends StatelessWidget {
         Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(incoming ? LucideIcons.arrowDownLeft : LucideIcons.arrowUpRight, size: 13, color: EvColors.ink3),
           const SizedBox(width: 4),
-          Text('${incoming ? 'To you' : 'You asked'} · ${EvDates.range(q.neededFrom, q.neededTo)}', style: EvType.caption),
+          // Flexible: at large text sizes the line shortens instead of overflowing.
+          Flexible(child: Text('${incoming ? 'To you' : 'You asked'} · ${EvDates.range(q.neededFrom, q.neededTo)}', style: EvType.caption, maxLines: 1, overflow: TextOverflow.ellipsis)),
         ]),
         if (waitingOnMe) Text('Your move', style: EvType.caption.copyWith(color: EvColors.bronzeDeep, fontWeight: FontWeight.w700)),
       ]),

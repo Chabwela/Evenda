@@ -79,6 +79,9 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
       ));
       await api.setCategories(b.id, [if (b.primaryCategory != null) b.primaryCategory!, ...b.categories.where((c) => c != b.primaryCategory)]);
       if (_locationChanged && _point != null) await api.setLocation(b.id, _point!, b.locationPrecision, _hood ?? nearestNeighbourhood(_point!).name);
+      // Fresh server copy, so the next save compares against this version.
+      _b = await api.get(b.id);
+      _locationChanged = false;
     }, success: 'Profile saved');
     if (mounted) setState(() => _busy = false);
   }
@@ -95,8 +98,10 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
       final current = await backend.business.get(_b!.id);
       final url = backend.photoUrl(path);
       await backend.business.update(current.copyWith(logoUrl: url));
-      // Keep the form's snapshot in step, or "Save profile" would restore the old logo.
-      _b = _b!.copyWith(logoUrl: url);
+      // Keep the form's snapshot in step (logo and server version), or the
+      // next "Save" would restore the old logo or be refused as out of date.
+      final fresh = await backend.business.get(_b!.id);
+      _b = _b!.copyWith(logoUrl: fresh.logoUrl).withVersionOf(fresh);
     }, success: 'Logo updated');
   }
 

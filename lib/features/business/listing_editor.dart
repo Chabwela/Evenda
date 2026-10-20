@@ -120,7 +120,7 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
     final api = ref.read(backendProvider).listings;
     final id = await guard(context, () async {
       if (widget.id == null) return api.create(d);
-      await api.update(widget.id!, d);
+      await api.update(widget.id!, d, basedOn: _original);
       return widget.id!;
     }, success: status == ListingStatus.published
         ? (_original?.status == ListingStatus.published ? 'Listing updated' : 'Published — vendors following this category will be told')

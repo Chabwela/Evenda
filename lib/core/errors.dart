@@ -48,6 +48,7 @@ class EvError implements Exception {
     'invalid_category_id': 'Use a shorter name with letters and numbers only.',
     'invalid_category_name': 'Category names need 2–60 characters.',
     'invalid_category_icon': 'Choose one of the icons shown.',
+    'stale_write': 'Someone else saved changes while you were editing. Go back and open it again to see the latest, then redo your change.',
     'documents_not_reviewed': 'Accept at least one verification document before verifying this business.',
     'invalid_status': 'That status is not allowed here.',
     'not_found': 'Not found, or you do not have access.',

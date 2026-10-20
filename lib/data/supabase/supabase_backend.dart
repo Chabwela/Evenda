@@ -341,7 +341,7 @@ class _SbBusiness implements BusinessApi {
 
   @override
   Future<void> update(Business x) async {
-    await b.call(() => b.client.from('businesses').update({
+    var q = b.client.from('businesses').update({
           'name': x.name,
           'description': x.description,
           'logo_path': x.logoUrl,
@@ -354,7 +354,12 @@ class _SbBusiness implements BusinessApi {
           'service_radius_km': x.serviceRadiusKm,
           'operating_hours': x.operatingHours,
           'onboarding_step': x.onboardingStep,
-        }).eq('id', x.id));
+        }).eq('id', x.id);
+    // Optimistic concurrency: refuse to overwrite a profile someone else saved
+    // after this copy was loaded.
+    if (x.updatedAt != null) q = q.eq('updated_at', x.updatedAt!.toUtc().toIso8601String());
+    final rows = await b.call(() => q.select('id'));
+    if (x.updatedAt != null && (rows as List).isEmpty) throw const EvError('stale_write');
     b.touch({DataDomain.business});
   }
 
@@ -489,15 +494,19 @@ class _SbListings implements ListingApi {
   }
 
   @override
-  Future<void> update(String id, ListingDraft d) async {
+  Future<void> update(String id, ListingDraft d, {Listing? basedOn}) async {
     final current = await get(id);
+    if (basedOn?.updatedAt != null && current.updatedAt != basedOn!.updatedAt) throw const EvError('stale_write');
     final j = d.toJson()
       ..remove('business_id')
       ..remove('total_quantity')
       ..remove('status');
     await b.call(() => b.client.from('listings').update(j).eq('id', id));
-    if (d.totalQuantity != current.totalQuantity) {
-      await adjustStock(id, d.totalQuantity - current.totalQuantity, 'correction', note: 'Edited on listing form');
+    // The vendor's change relative to what they saw, so a concurrent stock
+    // movement is never silently reverted.
+    final delta = d.totalQuantity - (basedOn ?? current).totalQuantity;
+    if (delta != 0) {
+      await adjustStock(id, delta, 'correction', note: 'Edited on listing form');
     }
     await _syncPhotos(id, d.photos);
     if (d.status != current.status) await setStatus(id, d.status);
@@ -545,6 +554,13 @@ class _SbListings implements ListingApi {
   @override
   Future<int> availableQuantity(String listingId, DateTime from, DateTime to) async =>
       await b.rpc('available_quantity', {'p_listing': listingId, 'p_from': b._date(from), 'p_to': b._date(to)}) as int;
+
+  @override
+  Future<Map<String, int>> availableQuantities(List<String> listingIds, DateTime from, DateTime to) async {
+    if (listingIds.isEmpty) return const {};
+    final rows = await b.rpc('available_quantities', {'p_listings': listingIds, 'p_from': b._date(from), 'p_to': b._date(to)}) as List;
+    return {for (final r in rows) r['listing_id'] as String: (r['available'] as num).toInt()};
+  }
 
   @override
   Future<List<AvailabilityDay>> calendar(String listingId, DateTime from, DateTime to) async {
@@ -624,7 +640,8 @@ class _SbDiscovery implements DiscoveryApi {
 
   @override
   Future<List<SearchResult>> search(String myBusinessId, SearchQuery q) async {
-    final me = await b.business.get(myBusinessId);
+    // Own location for distance ranking, fetched alongside the search.
+    final meFuture = b.business.get(myBusinessId);
     var query = b.client.from('listings').select(Listing.columns).eq('status', 'published').eq('moderation_status', 'ok').neq('business_id', myBusinessId);
     if (q.categoryId != null) query = query.eq('category_id', q.categoryId!);
     if (q.kind != null) query = query.eq('kind', q.kind!.wire);
@@ -647,6 +664,11 @@ class _SbDiscovery implements DiscoveryApi {
         ? const []
         : await b.call(() => b.client.from('businesses').select('id, public_location').inFilter('id', ids));
     final locs = {for (final r in bizRows) r['id'] as String: Business.fromRow({...r, 'owner_id': '', 'name': ''}).location};
+    // One round trip for all date-aware availability (was one per listing).
+    final avails = q.from == null
+        ? const <String, int>{}
+        : await b.listings.availableQuantities([for (final l in listings) if (l.tracksStock) l.id], q.from!, q.to ?? q.from!);
+    final me = await meFuture;
     final hood = q.neighbourhood == null ? null : kNeighbourhoods.where((n) => n.name == q.neighbourhood).firstOrNull;
     final origin = hood?.point ?? me.location;
     const dist = Distance();
@@ -656,7 +678,7 @@ class _SbDiscovery implements DiscoveryApi {
       int? avail;
       if (q.from != null && l.tracksStock) {
         // Authoritative, date-aware availability from the database.
-        avail = await b.listings.availableQuantity(l.id, q.from!, q.to ?? q.from!);
+        avail = avails[l.id] ?? 0;
         if (avail == 0 || (q.quantity != null && avail < q.quantity!)) continue;
       } else if (q.quantity != null && l.tracksStock && l.usable < q.quantity!) {
         continue;

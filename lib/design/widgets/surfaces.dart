@@ -303,10 +303,15 @@ class EvPhoto extends StatelessWidget {
     } else if (src!.startsWith('asset:')) {
       img = Image.asset(src!.substring(6), width: width, height: height, fit: fit, errorBuilder: (_, _, _) => placeholder);
     } else {
+      // Decode at display size: a 1600 px photo in a 112 px thumbnail otherwise
+      // costs ~10 MB of image memory per row in long lists.
+      final dpr = MediaQuery.devicePixelRatioOf(context);
       img = CachedNetworkImage(
         imageUrl: src!,
         width: width,
         height: height,
+        memCacheWidth: width == null || width!.isInfinite ? null : (width! * dpr).round(),
+        memCacheHeight: width == null && height != null && !height!.isInfinite ? (height! * dpr).round() : null,
         fit: fit,
         fadeInDuration: EvMotion.base,
         placeholder: (_, _) => placeholder,

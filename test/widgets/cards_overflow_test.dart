@@ -4,9 +4,13 @@ import 'package:evenda/features/shared/feed_cards.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../helpers/fonts.dart';
+
 /// Regression: the Find listing card overflowed at the bottom (fixed 112 px
 /// text column) with a two-line title on a 360 dp phone.
 void main() {
+  setUpAll(loadAppFonts);
+
   for (final scale in [1.0, 1.3]) {
     testWidgets('ListingResultCard fits a long listing at text scale $scale', (t) async {
       t.view.physicalSize = const Size(1080, 2400);

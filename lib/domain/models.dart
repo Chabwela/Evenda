@@ -167,6 +167,7 @@ class Business {
     this.verification = VerificationStatus.unverified,
     this.status = BusinessStatus.active,
     this.createdAt,
+    this.updatedAt,
   });
 
   final String id;
@@ -196,6 +197,9 @@ class Business {
   final BusinessStatus status;
   final DateTime? createdAt;
 
+  /// Server version of this row; saves are refused if it changed meanwhile.
+  final DateTime? updatedAt;
+
   bool get rents => offeringTypes.contains(OfferingType.rental);
   bool get servicesOnly => !rents && offeringTypes.isNotEmpty;
   bool get verified => verification == VerificationStatus.verified;
@@ -207,7 +211,7 @@ class Business {
   static const columns =
       'id, owner_id, name, description, logo_path, primary_category, offering_types, phone, whatsapp, email, '
       'neighbourhood, address_line, location_precision, public_location, service_radius_km, operating_hours, '
-      'onboarding_step, onboarding_completed_at, verification_status, status, created_at, business_categories(category_id)';
+      'onboarding_step, onboarding_completed_at, verification_status, status, created_at, updated_at, business_categories(category_id)';
 
   factory Business.fromRow(Map<String, dynamic> r) {
     LatLng? loc;
@@ -242,6 +246,7 @@ class Business {
       verification: VerificationStatus.parse(r['verification_status']),
       status: BusinessStatus.parse(r['status']),
       createdAt: _dt(r['created_at']),
+      updatedAt: _dt(r['updated_at']),
     );
   }
 
@@ -289,6 +294,19 @@ class Business {
         verification: verification ?? this.verification,
         status: status ?? this.status,
         createdAt: createdAt,
+        updatedAt: updatedAt,
+      );
+}
+
+extension BusinessVersion on Business {
+  /// This business with [other]'s server version, keeping local edits.
+  Business withVersionOf(Business other) => Business(
+        id: id, ownerId: ownerId, name: name, description: description, logoUrl: logoUrl, primaryCategory: primaryCategory,
+        categories: categories, offeringTypes: offeringTypes, phone: phone, whatsapp: whatsapp, email: email,
+        neighbourhood: neighbourhood, addressLine: addressLine, location: location, locationPrecision: locationPrecision,
+        serviceRadiusKm: serviceRadiusKm, operatingHours: operatingHours, onboardingStep: onboardingStep,
+        onboardingCompleted: onboardingCompleted, verification: verification, status: status, createdAt: createdAt,
+        updatedAt: other.updatedAt,
       );
 }
 

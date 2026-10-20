@@ -413,7 +413,7 @@ class _DemoListings implements ListingApi {
   }
 
   @override
-  Future<void> update(String id, ListingDraft d) async {
+  Future<void> update(String id, ListingDraft d, {Listing? basedOn}) async {
     final old = db.listings[id]!;
     db.requireMember(old.businessId);
     await DemoBackend.latency(300);
@@ -525,6 +525,10 @@ class _DemoListings implements ListingApi {
     await DemoBackend.latency(200);
     return db.available(listingId, from, to);
   }
+
+  @override
+  Future<Map<String, int>> availableQuantities(List<String> listingIds, DateTime from, DateTime to) async =>
+      {for (final id in listingIds) id: await availableQuantity(id, from, to)};
 
   @override
   Future<List<AvailabilityDay>> calendar(String listingId, DateTime from, DateTime to) async {

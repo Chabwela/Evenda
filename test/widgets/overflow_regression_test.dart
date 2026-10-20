@@ -7,9 +7,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import '../helpers/fonts.dart';
+
 /// Regression: the Find listing card and the incoming request row overflowed
 /// on a 360 dp phone. Rendered here at 360 dp with 1.3× text (the app's cap).
 void main() {
+  setUpAll(loadAppFonts);
+
   Future<void> render(WidgetTester t, Widget child) async {
     t.view.physicalSize = const Size(1080, 2400);
     t.view.devicePixelRatio = 3;
@@ -25,20 +29,28 @@ void main() {
   }
 
   testWidgets('Find listing card fits with a long title and long business details', (t) async {
-    final backend = DemoBackend();
-    await backend.auth.signIn('mutale@demo.evenda.zm', 'demo-vendor');
-    // The longest real title in the demo catalogue wraps to two lines.
-    final listing = ((await backend.listings.mine('b-kabwata'))..sort((a, b) => b.title.length.compareTo(a.title.length))).first;
-    backend.dispose();
+    // DemoBackend simulates network delay with real timers, which never fire
+    // under the test's fake clock; run its calls on the real clock.
+    final listing = (await t.runAsync(() async {
+      final backend = DemoBackend();
+      await backend.auth.signIn('mutale@demo.evenda.zm', 'demo-vendor');
+      // The longest real title in the demo catalogue wraps to two lines.
+      final l = ((await backend.listings.mine('b-kabwata'))..sort((a, b) => b.title.length.compareTo(a.title.length))).first;
+      backend.dispose();
+      return l;
+    }))!;
     await render(t, ListingResultCard(result: SearchResult(listing: listing, available: 1240, distanceKm: 12.4)));
     expect(t.takeException(), isNull);
   });
 
   testWidgets('Incoming request row fits next to its status pill', (t) async {
-    final backend = DemoBackend();
-    await backend.auth.signIn('mutale@demo.evenda.zm', 'demo-vendor');
-    final requests = await backend.bookings.requests('b-kabwata');
-    backend.dispose();
+    final requests = (await t.runAsync(() async {
+      final backend = DemoBackend();
+      await backend.auth.signIn('mutale@demo.evenda.zm', 'demo-vendor');
+      final r = await backend.bookings.requests('b-kabwata');
+      backend.dispose();
+      return r;
+    }))!;
     final incoming = requests.firstWhere((q) => q.supplier.id == 'b-kabwata' && q.status == QuoteRequestStatus.open,
         orElse: () => requests.first);
     await render(t, RequestRow(request: incoming, me: 'b-kabwata'));

@@ -97,7 +97,10 @@ abstract class ListingApi {
   Future<List<Listing>> mine(String businessId);
   Future<Listing> get(String id);
   Future<String> create(ListingDraft draft);
-  Future<void> update(String id, ListingDraft draft);
+  /// Save edits made on [basedOn] (the copy the editor opened). Refused with
+  /// `stale_write` if the listing changed meanwhile; stock changes are applied
+  /// as the difference the vendor made, never as an absolute overwrite.
+  Future<void> update(String id, ListingDraft draft, {Listing? basedOn});
   Future<void> setStatus(String id, ListingStatus status);
   Future<List<String>> uploadPhotos(String businessId, List<(Uint8List, String)> files);
 
@@ -107,6 +110,9 @@ abstract class ListingApi {
 
   /// Backend-computed availability for the whole range (minimum across days).
   Future<int> availableQuantity(String listingId, DateTime from, DateTime to);
+
+  /// Availability for many listings in one round trip.
+  Future<Map<String, int>> availableQuantities(List<String> listingIds, DateTime from, DateTime to);
   Future<List<AvailabilityDay>> calendar(String listingId, DateTime from, DateTime to);
 
   Future<List<Reservation>> reservations(String businessId, {String? listingId, bool upcomingOnly = true});
