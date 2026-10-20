@@ -145,9 +145,14 @@ class SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: padding ?? const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x6, EvSpace.x2, EvSpace.x2),
         child: Row(children: [
-          Flexible(child: Text(_sentence(title), style: EvType.headline.copyWith(fontSize: 16), maxLines: 2, overflow: TextOverflow.ellipsis)),
-          if (count != null) ...[const SizedBox(width: 6), Text('$count', style: EvType.headline.copyWith(fontSize: 16, color: EvColors.ink3, fontWeight: FontWeight.w500))],
-          const Spacer(),
+          // Title takes all the room the action leaves (Flexible + Spacer split it
+          // 50/50 and wrapped titles like "Verification documents").
+          Expanded(
+            child: Row(children: [
+              Flexible(child: Text(_sentence(title), style: EvType.headline.copyWith(fontSize: 16), maxLines: 2, overflow: TextOverflow.ellipsis)),
+              if (count != null) ...[const SizedBox(width: 6), Text('$count', style: EvType.headline.copyWith(fontSize: 16, color: EvColors.ink3, fontWeight: FontWeight.w500))],
+            ]),
+          ),
           if (action != null)
             TextButton(
               onPressed: onAction,

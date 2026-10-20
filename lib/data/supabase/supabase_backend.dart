@@ -114,18 +114,27 @@ class SupabaseBackend implements Backend {
   Future<void> reconnect() => _resubscribe();
 
   /// Runs a call and converts Postgres/PostgREST/Auth errors to [EvError].
-  Future<T> call<T>(Future<T> Function() f) async {
+  Future<T> call<T>(Future<T> Function() f, {Duration timeout = const Duration(seconds: 25)}) async {
     try {
-      return await f().timeout(const Duration(seconds: 25));
+      return await f().timeout(timeout);
     } on sb.PostgrestException catch (e) {
       throw _mapPostgrest(e);
     } on sb.AuthException catch (e) {
       throw _mapAuth(e);
     } on sb.StorageException catch (e) {
-      throw EvError('storage', e.message);
+      throw _mapStorage(e);
     } catch (e) {
       throw EvError.from(e);
     }
+  }
+
+  EvError _mapStorage(sb.StorageException e) {
+    final m = e.message.toLowerCase();
+    if (e.statusCode == '413' || m.contains('maximum allowed size') || m.contains('too large')) return const EvError('file_too_large');
+    if (m.contains('mime type') || m.contains('invalid_mime') || e.statusCode == '415') return const EvError('file_type_not_allowed');
+    if (e.statusCode == '403' || m.contains('row-level security') || m.contains('unauthorized')) return const EvError('forbidden');
+    if (m.contains('clientexception') || m.contains('failed host lookup') || m.contains('socket')) return const EvError('offline');
+    return EvError('storage', e.message);
   }
 
   EvError _mapAuth(sb.AuthException e) {
@@ -453,11 +462,40 @@ class _SbBusiness implements BusinessApi {
   }
 
   @override
-  Future<void> uploadVerificationDocument(String businessId, String docType, Uint8List bytes, String ext) async {
+  Future<VerificationDocument> uploadVerificationDocument(String businessId, String docType, Uint8List bytes, String ext) async {
     final path = '$businessId/${_uuid.v4()}.$ext';
-    await b.call(() => b.client.storage.from('verification').uploadBinary(path, bytes,
-        fileOptions: sb.FileOptions(contentType: kDocumentTypes[ext] ?? 'application/octet-stream')));
-    await b.call(() => b.client.from('verification_documents').insert({'business_id': businessId, 'doc_type': docType, 'storage_path': path}));
+    // Documents run up to 10 MB on mobile data: allow ~1 Mbit/s plus headroom
+    // instead of the 25 s used for ordinary calls (which failed large PDFs).
+    final mb = bytes.length / (1024 * 1024);
+    final timeout = Duration(seconds: (30 + 20 * mb).clamp(30, 240).round());
+    await b.call(
+        () => b.client.storage.from('verification').uploadBinary(path, bytes,
+            fileOptions: sb.FileOptions(contentType: kDocumentTypes[ext] ?? 'application/octet-stream')),
+        timeout: timeout);
+    final row = await b.call(() => b.client
+        .from('verification_documents')
+        .insert({'business_id': businessId, 'doc_type': docType, 'storage_path': path})
+        .select()
+        .single());
+    b.touch({DataDomain.business});
+    return VerificationDocument(row);
+  }
+
+  @override
+  Future<String?> verificationFeedback(String businessId) async {
+    try {
+      final r = await b.rpc('verification_feedback', {'p_business': businessId});
+      return r is String && r.trim().isNotEmpty ? r.trim() : null;
+    } catch (_) {
+      // Server without migration 20261020000700: no stored reason yet.
+      return null;
+    }
+  }
+
+  @override
+  Future<List<VerificationDocument>> verificationDocuments(String businessId) async {
+    final rows = await b.call(() => b.client.from('verification_documents').select().eq('business_id', businessId).order('created_at', ascending: false));
+    return [for (final r in rows) VerificationDocument(r)];
   }
 
   @override
@@ -1434,6 +1472,35 @@ class _SbAdmin implements AdminApi {
   Future<List<Dispute>> disputes() async {
     final rows = await b.call(() => b.client.from('disputes').select('*, bookings(reference), businesses(name)').order('created_at', ascending: false));
     return [for (final r in rows) Dispute.fromRow(r)];
+  }
+
+  // Servers without migration 20261020000900 only have admin_resolve_dispute.
+  static bool _missingFn(Object e) => e is EvError && (e.message ?? '').contains('Could not find the function');
+
+  @override
+  Future<void> takeDispute(String disputeId, {String? note}) async {
+    try {
+      await b.rpc('admin_take_dispute', {'p_dispute': disputeId, 'p_note': note});
+    } catch (e) {
+      if (!_missingFn(e)) rethrow;
+      await resolveDispute(disputeId, 'investigating', (note ?? '').trim().isEmpty ? 'Taken by Evenda' : note!);
+    }
+    b.touch({DataDomain.admin});
+  }
+
+  @override
+  Future<void> ruleDispute(String disputeId, {required String decision, required String ruling, required String bookingOutcome}) async {
+    try {
+      await b.rpc('admin_rule_dispute', {'p_dispute': disputeId, 'p_decision': decision, 'p_ruling': ruling, 'p_booking_outcome': bookingOutcome});
+    } catch (e) {
+      if (!_missingFn(e) || bookingOutcome == 'complete') rethrow;
+      await resolveDispute(disputeId, decision, ruling);
+      if (bookingOutcome == 'cancel') {
+        final d = await b.call(() => b.client.from('disputes').select('booking_id').eq('id', disputeId).single());
+        await cancelBooking(d['booking_id'], ruling);
+      }
+    }
+    b.touch({DataDomain.admin, DataDomain.bookings});
   }
 
   @override

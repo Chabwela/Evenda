@@ -91,7 +91,15 @@ abstract class BusinessApi {
   Future<LatLng?> exactLocation(String businessId);
   Future<void> completeOnboarding(String businessId);
   Future<String> uploadLogo(String businessId, Uint8List bytes, String extension);
-  Future<void> uploadVerificationDocument(String businessId, String docType, Uint8List bytes, String extension);
+  /// Uploads the file, then records it. Completes only when the server has both,
+  /// so "uploaded" in the UI is never shown for a document Evenda doesn't have.
+  Future<VerificationDocument> uploadVerificationDocument(String businessId, String docType, Uint8List bytes, String extension);
+
+  /// Documents this business has sent for verification, newest first.
+  Future<List<VerificationDocument>> verificationDocuments(String businessId);
+
+  /// Why Evenda turned verification down (while rejected), or null.
+  Future<String?> verificationFeedback(String businessId);
   Future<void> submitForVerification(String businessId);
 
   Future<List<TeamMember>> team(String businessId);
@@ -266,6 +274,14 @@ abstract class AdminApi {
   Future<void> voidPayment(String paymentId, String reason);
   Future<List<Dispute>> disputes();
   Future<void> resolveDispute(String disputeId, String status, String resolution);
+
+  /// Take the case: status 'investigating'; both businesses are told.
+  Future<void> takeDispute(String disputeId, {String? note});
+
+  /// Rule: [decision] 'resolved' (upheld) or 'dismissed' (not upheld), with a
+  /// ruling both businesses see and what happens to the booking:
+  /// 'resume' (back to where it was), 'complete' or 'cancel'.
+  Future<void> ruleDispute(String disputeId, {required String decision, required String ruling, required String bookingOutcome});
   Future<List<AuditEntry>> auditLog();
   Future<void> upsertCategory(Category category, bool active, String reason);
 

@@ -182,7 +182,10 @@ class _Overview extends ConsumerWidget {
         // What needs a person, most serious first. Only sections this role can open.
         final queue = <_QueueItem>[
           _QueueItem(LucideIcons.gavel, 'Open disputes', 'Vendors waiting for a ruling', n('open_disputes'), Tone.critical, _Section.disputes),
-          _QueueItem(LucideIcons.badgeCheck, 'Verification requests', 'Documents to check before the badge', n('pending_verification'), Tone.waiting, _Section.businesses),
+          _QueueItem(LucideIcons.badgeCheck, 'Verification requests',
+              n('waiting_vendor') > 0 ? 'Documents to check · ${n('waiting_vendor')} waiting for the vendor' : 'Documents to check before the badge',
+              n('pending_verification'), Tone.waiting, _Section.businesses,
+              idle: n('waiting_vendor') > 0 ? 'Nothing to check · ${n('waiting_vendor')} waiting for the vendor' : 'All clear'),
           _QueueItem(LucideIcons.flag, 'Flagged listings', 'Listings reported or held for review', n('flagged_listings'), Tone.attention, _Section.listings),
           _QueueItem(LucideIcons.zap, 'Live Evenda Now', 'Urgent requests open right now', n('now_open'), Tone.progress, _Section.now),
           _QueueItem(LucideIcons.bellOff, 'Failed pushes (24 h)', 'Notifications that did not reach a phone', n('push_failed_24h'), Tone.attention, null),
@@ -225,10 +228,13 @@ class _Overview extends ConsumerWidget {
 }
 
 class _QueueItem {
-  const _QueueItem(this.icon, this.title, this.hint, this.count, this.tone, this.section);
+  const _QueueItem(this.icon, this.title, this.hint, this.count, this.tone, this.section, {this.idle = 'All clear'});
   final IconData icon;
   final String title;
   final String hint;
+
+  /// Shown when nothing needs the admin (e.g. "1 waiting for the vendor").
+  final String idle;
   final int count;
   final Tone tone;
   final _Section? section;
@@ -253,7 +259,7 @@ class _QueueRow extends StatelessWidget {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(q.title, style: active ? EvType.bodyStrong : EvType.body.copyWith(color: EvColors.ink2)),
-              Text(active ? q.hint : 'All clear', style: EvType.caption),
+              Text(active ? q.hint : q.idle, style: EvType.caption),
             ]),
           ),
           if (active)
@@ -316,9 +322,17 @@ class _BusinessesState extends ConsumerState<_Businesses> {
                 return EvRow(
                   leading: BusinessAvatar(name: b.name, verified: b.verification == VerificationStatus.verified),
                   title: b.name,
-                  subtitle: '${categoryById(b.primaryCategory).name} · ${b.neighbourhood ?? '—'} · ${b.listings} listings · ${b.documents} documents',
+                  subtitle: '${categoryById(b.primaryCategory).name} · ${b.neighbourhood ?? '—'} · ${plural(b.listings, 'listing')} · ${plural(b.documents, 'document')}',
                   meta: Row(children: [
-                    StatusPill(b.verification.label, tone: toneForVerification(b.verification), dense: true),
+                    // Pending says whose move it is, not just "pending".
+                    if (b.verification == VerificationStatus.pending && b.documentsToReview != null)
+                      StatusPill(
+                        b.waitingForVendor ? 'Waiting for vendor' : (b.documentsToReview! > 0 ? '${b.documentsToReview} to review' : 'Ready to verify'),
+                        tone: b.waitingForVendor ? Tone.progress : Tone.waiting,
+                        dense: true,
+                      )
+                    else
+                      StatusPill(b.verification.label, tone: toneForVerification(b.verification), dense: true),
                     if (b.status == BusinessStatus.suspended) ...[const SizedBox(width: 6), const StatusPill('Suspended', tone: Tone.critical, dense: true)],
                   ]),
                   // Decisions happen on the review screen, after the documents
@@ -1228,39 +1242,45 @@ class _Disputes extends ConsumerWidget {
   const _Disputes();
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final api = ref.read(backendProvider).admin;
     return AsyncView(
       value: ref.watch(_disputesProvider),
       onRetry: () => ref.invalidate(_disputesProvider),
       isEmpty: (l) => l.isEmpty,
       empty: const EmptyState(mascot: Mascot.chair, title: 'No disputes', body: 'Disputes opened from bookings appear here.', compact: true),
-      data: (list) => ListView.separated(
-        itemCount: list.length,
-        separatorBuilder: (_, _) => const EvDivider(indent: EvSpace.gutter),
-        itemBuilder: (c, i) {
-          final d = list[i];
-          final open = d.status == 'open' || d.status == 'investigating';
+      // Open cases first, oldest first (longest waiting); closed ones after.
+      data: (all) {
+        final open = all.where((d) => d.isOpen).toList()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        final closed = all.where((d) => !d.isOpen).toList();
+        Widget row(Dispute d) {
+          final days = DateTime.now().difference(d.createdAt).inDays;
+          final age = days == 0 ? 'today' : '${plural(days, 'day')} ago';
           return EvRow(
-            title: '${d.bookingReference ?? 'Booking'} · opened by ${d.openedBy ?? '—'}',
-            subtitle: d.resolution != null ? '${d.reason}\nResolution: ${d.resolution}' : d.reason,
-            meta: StatusPill(d.status, tone: open ? Tone.critical : Tone.neutral, dense: true),
-            trailing: open
-                ? PopupMenuButton<String>(
-                    icon: const Icon(LucideIcons.ellipsisVertical, size: 18),
-                    onSelected: (st) async {
-                      final reason = await confirmWithReason(context, title: st == 'investigating' ? 'Start investigating' : 'Close dispute', body: 'Record what was decided and why.');
-                      if (reason != null && context.mounted) await guard(context, () => api.resolveDispute(d.id, st, reason), success: 'Dispute updated');
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'investigating', child: Text('Mark investigating')),
-                      PopupMenuItem(value: 'resolved', child: Text('Resolve')),
-                      PopupMenuItem(value: 'dismissed', child: Text('Dismiss')),
-                    ],
-                  )
-                : null,
+            title: d.bookingReference ?? 'Booking',
+            subtitle: '“${d.reason}”',
+            meta: Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              StatusPill(d.statusLabel,
+                  tone: switch (d.status) { 'open' => Tone.critical, 'investigating' => Tone.progress, 'resolved' => Tone.positive, _ => Tone.neutral }, dense: true),
+              Text('by ${d.openedBy ?? '—'} · ${d.isOpen ? age : EvDates.dayShort(d.updatedAt ?? d.createdAt)}',
+                  style: EvType.caption.copyWith(color: d.isOpen && days >= 2 ? EvColors.danger : EvColors.ink3)),
+            ]),
+            onTap: () async {
+              await context.push('/admin/dispute/${d.id}');
+              ref.invalidate(_disputesProvider);
+            },
           );
-        },
-      ),
+        }
+
+        return ListView(children: [
+          if (open.isNotEmpty) ...[
+            SectionHeader('Waiting on Evenda', count: open.length),
+            for (final (i, d) in open.indexed) ...[if (i > 0) const EvDivider(indent: EvSpace.gutter), row(d)],
+          ],
+          if (closed.isNotEmpty) ...[
+            SectionHeader('Ruled', count: closed.length),
+            for (final (i, d) in closed.indexed) ...[if (i > 0) const EvDivider(indent: EvSpace.gutter), row(d)],
+          ],
+        ]);
+      },
     );
   }
 }

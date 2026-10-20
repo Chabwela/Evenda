@@ -23,7 +23,7 @@ blockers found in this audit are fixed.
 | Backup of session tokens | PASS (fixed) | `allowBackup` was the default (true), so Android could back up the saved sign-in session | Set `allowBackup="false"` | — |
 | Permissions justified | PASS | INTERNET, ACCESS_NETWORK_STATE, FINE/COARSE_LOCATION, POST_NOTIFICATIONS, WAKE_LOCK, C2DM RECEIVE | All used (see §5) | — |
 | Privacy policy | FAIL | None existed | Draft at `docs/play/privacy-policy.html`, built from the code | Confirm the [CONFIRM] items, host it publicly, enter the URL in Play Console, build with `--dart-define=PRIVACY_POLICY_URL=…` |
-| In-app account deletion | FAIL → fixed in code | None existed | Business → Delete account; backend `delete_my_account()` | Run migration `20261020000300`; test with a throwaway account |
+| In-app account deletion | FAIL → fixed in code | None existed | Business → Account & privacy → Delete account; backend `delete_my_account()` | Run migration `20261020000300`; test with a throwaway account |
 | Web account-deletion page | FAIL | None existed | Draft at `docs/play/delete-account.html` | Confirm, host, enter URL in Data safety |
 | Data safety form | NOT TESTED | No console access | Proposed answers in `DATA_SAFETY.md` | Fill in and compare with the console |
 | Store listing assets | FAIL | None existed | 512 px icon and feature graphic created; listing text drafted | Add ≥ 2 real phone screenshots, support email, category, content rating |

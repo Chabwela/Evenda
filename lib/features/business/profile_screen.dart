@@ -9,6 +9,53 @@ import '../../design/ev.dart';
 import '../../domain/models.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../shared/map_widgets.dart';
+import 'verification_docs.dart';
+
+/// Why verification was turned down and what to do, in plain words: the admin's
+/// reason for the business, then each document that wasn't accepted.
+class _WhatToFix extends ConsumerWidget {
+  const _WhatToFix({required this.biz});
+  final Business biz;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rejected = biz.verification == VerificationStatus.rejected;
+    final reason = rejected ? ref.watch(verificationFeedbackProvider(biz.id)).value : null;
+    final docs = ref.watch(verificationDocsProvider(biz.id)).value ?? const <VerificationDocument>[];
+    // Latest document of each type that Evenda turned down.
+    final latest = <String, VerificationDocument>{};
+    for (final d in docs) {
+      latest.putIfAbsent(d.docType, () => d);
+    }
+    final turnedDown = latest.values.where((d) => d.status == 'rejected').toList();
+    if (!rejected && turnedDown.isEmpty) return const SizedBox.shrink();
+
+    final lines = <String>[
+      ?reason,
+      for (final d in turnedDown) '${d.typeLabel}${d.reviewNote == null || d.reviewNote!.isEmpty ? ' wasn’t accepted' : ': ${d.reviewNote}'}',
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(top: EvSpace.x5),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(EvSpace.x4, EvSpace.x3, EvSpace.x4, EvSpace.x3),
+        decoration: const BoxDecoration(border: Border(left: BorderSide(color: EvColors.danger, width: 3))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('What to fix', style: EvType.bodyStrong),
+          const SizedBox(height: 4),
+          if (lines.isEmpty) Text('Upload clear, current documents.', style: EvType.small),
+          for (final l in lines) Padding(padding: const EdgeInsets.only(top: 2), child: Text('• $l', style: EvType.small.copyWith(color: EvColors.ink))),
+          const SizedBox(height: 8),
+          Text(
+            rejected
+                ? 'Replace it below, then tap “Send for review again”.'
+                : 'Upload a new one below. It goes straight to the reviewer; your business stays in review.',
+            style: EvType.small,
+          ),
+        ]),
+      ),
+    );
+  }
+}
 
 /// Business settings: identity, offering, contact, location, hours, verification.
 class BusinessProfileScreen extends ConsumerStatefulWidget {
@@ -104,18 +151,16 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
     }, success: 'Logo updated');
   }
 
-  Future<void> _uploadDoc() async {
-    final type = await pickFromSheet<String>(context, title: 'Document type', options: const [
-      ('pacra_certificate', 'PACRA certificate', null),
-      ('tpin', 'ZRA TPIN certificate', null),
-      ('national_id', 'Owner’s NRC', null),
-      ('other', 'Other', null),
-    ]);
-    if (type == null || !mounted) return;
-    final doc = await pickDocument(context);
-    if (doc == null || !mounted) return;
-    await guard(context, () => ref.read(backendProvider).business.uploadVerificationDocument(_b!.id, type, doc.bytes, doc.ext),
-        success: 'Uploaded. Submit for review when you’re ready.');
+
+  bool _uploading = false;
+  bool _submitting = false;
+
+  static bool _canSend(Business b) => b.verification == VerificationStatus.unverified || b.verification == VerificationStatus.rejected;
+
+  Future<void> _submit(String id) async {
+    setState(() => _submitting = true);
+    await guard(context, () => ref.read(backendProvider).business.submitForVerification(id), success: 'Sent to the Evenda team for review');
+    if (mounted) setState(() => _submitting = false);
   }
 
   @override
@@ -160,19 +205,40 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                 Text(switch (biz.verification) {
                   VerificationStatus.verified => 'Shown with a verified badge in search.',
                   VerificationStatus.pending => 'Documents are with the Evenda team for review.',
-                  VerificationStatus.rejected => 'Please upload clearer or current documents.',
+                  VerificationStatus.rejected => 'Evenda couldn’t verify your business yet. You can fix it and send it again.',
                   VerificationStatus.unverified => 'Upload a registration document to get verified.',
                 }, style: EvType.small),
               ]),
             ),
           ]),
-          if (biz.verification == VerificationStatus.unverified || biz.verification == VerificationStatus.rejected) ...[
+          if (biz.verification == VerificationStatus.rejected || biz.verification == VerificationStatus.pending) _WhatToFix(biz: biz),
+          const SectionHeader('Verification documents', padding: EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
+          VerificationDocsSection(
+            businessId: b.id,
+            types: const [...kVerificationDocTypes, ('other', 'Other document', 'Anything else that shows the business is real')],
+            locked: !_canSend(biz),
+            allowReplacingRejected: biz.verification == VerificationStatus.pending,
+            onBusyChanged: (v) => setState(() => _uploading = v),
+          ),
+          if (_canSend(biz)) ...[
             const SizedBox(height: EvSpace.x3),
-            // Stacked: side by side, both labels were cut off on 360 dp phones.
-            EvButton('Upload document', kind: EvButtonKind.secondary, icon: LucideIcons.fileUp, expand: true, onPressed: _uploadDoc),
-            const SizedBox(height: 8),
-            EvButton('Submit for review', icon: LucideIcons.shieldCheck, expand: true,
-                onPressed: () => guard(context, () => ref.read(backendProvider).business.submitForVerification(b.id), success: 'Submitted for verification')),
+            Builder(builder: (context) {
+              // Only documents the server has count. After a rejection, at least
+              // one must be new (still waiting for review), not a turned-down one.
+              final rejected = biz.verification == VerificationStatus.rejected;
+              final docs = ref.watch(verificationDocsProvider(b.id)).value ?? const [];
+              final ready = docs.any((d) => rejected ? d.status == 'submitted' : d.status != 'rejected');
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                EvButton(rejected ? 'Send for review again' : 'Submit for review', icon: LucideIcons.shieldCheck, expand: true, loading: _submitting,
+                    onPressed: ready && !_uploading && !_submitting ? () => _submit(b.id) : null),
+                if (!ready || _uploading)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(_uploading ? 'Wait for the upload to finish.' : biz.verification == VerificationStatus.rejected ? 'Upload a new document first.' : 'Upload at least one document first.',
+                        style: EvType.caption, textAlign: TextAlign.center),
+                  ),
+              ]);
+            }),
           ],
           const SectionHeader('Identity', padding: EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
           EvField(label: 'Business name', controller: _name, validator: (v) => (v == null || v.trim().length < 2) ? 'Required' : null),

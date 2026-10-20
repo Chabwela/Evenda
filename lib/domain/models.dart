@@ -1866,6 +1866,8 @@ class AdminBusinessRow {
     this.primaryCategory,
     this.listings = 0,
     this.documents = 0,
+    this.documentsToReview,
+    this.documentsAccepted,
   });
   final String id;
   final String name;
@@ -1877,6 +1879,14 @@ class AdminBusinessRow {
   final int listings;
   final int documents;
 
+  /// Null on a server without migration 20261020000800.
+  final int? documentsToReview;
+  final int? documentsAccepted;
+
+  /// Pending, but nothing for the admin to decide: every document was rejected.
+  bool get waitingForVendor =>
+      verification == VerificationStatus.pending && documentsToReview == 0 && documentsAccepted == 0;
+
   factory AdminBusinessRow.fromRow(Map<String, dynamic> r) => AdminBusinessRow(
         id: r['id'],
         name: r['name'],
@@ -1887,6 +1897,8 @@ class AdminBusinessRow {
         createdAt: _dt(r['created_at'])!,
         listings: r['listings'] ?? 0,
         documents: r['documents'] ?? 0,
+        documentsToReview: r['documents_to_review'],
+        documentsAccepted: r['documents_accepted'],
       );
 }
 
@@ -1916,7 +1928,18 @@ class AuditEntry {
 }
 
 class Dispute {
-  const Dispute({required this.id, required this.bookingId, required this.reason, required this.status, required this.createdAt, this.bookingReference, this.openedBy, this.resolution});
+  const Dispute({
+    required this.id,
+    required this.bookingId,
+    required this.reason,
+    required this.status,
+    required this.createdAt,
+    this.bookingReference,
+    this.openedBy,
+    this.openedByBusinessId,
+    this.resolution,
+    this.updatedAt,
+  });
   final String id;
   final String bookingId;
   final String reason;
@@ -1924,7 +1947,20 @@ class Dispute {
   final DateTime createdAt;
   final String? bookingReference;
   final String? openedBy;
+  final String? openedByBusinessId;
   final String? resolution;
+  final DateTime? updatedAt;
+
+  bool get isOpen => status == 'open' || status == 'investigating';
+
+  /// Plain words for the admin: whose move it is.
+  String get statusLabel => switch (status) {
+        'open' => 'Waiting for a ruling',
+        'investigating' => 'Investigating',
+        'resolved' => 'Upheld',
+        'dismissed' => 'Not upheld',
+        _ => status,
+      };
 
   factory Dispute.fromRow(Map<String, dynamic> r) => Dispute(
         id: r['id'],
@@ -1934,7 +1970,9 @@ class Dispute {
         createdAt: _dt(r['created_at'])!,
         bookingReference: r['bookings']?['reference'],
         openedBy: r['businesses']?['name'],
+        openedByBusinessId: r['opened_by_business'],
         resolution: r['resolution'],
+        updatedAt: _dt(r['updated_at']),
       );
 }
 
@@ -2000,6 +2038,9 @@ class AdminDocument {
         _ => 'Other document',
       };
 }
+
+/// A business's own view of a document it sent (same row the admin reviews).
+typedef VerificationDocument = AdminDocument;
 
 /// Admin view of one Evenda Now request: who was alerted, what they offered,
 /// and how the request moved.

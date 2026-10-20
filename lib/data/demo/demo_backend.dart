@@ -296,16 +296,38 @@ class _DemoBusiness implements BusinessApi {
   }
 
   @override
-  Future<void> uploadVerificationDocument(String businessId, String docType, Uint8List bytes, String extension) async {
+  Future<VerificationDocument> uploadVerificationDocument(String businessId, String docType, Uint8List bytes, String extension) async {
     db.requireMember(businessId);
     await DemoBackend.latency(500);
-    db.verificationDocs[businessId] = (db.verificationDocs[businessId] ?? 0) + 1;
+    final doc = VerificationDocument({
+      'id': 'doc-${DateTime.now().microsecondsSinceEpoch}',
+      'doc_type': docType,
+      'storage_path': '$businessId/demo.$extension',
+      'status': 'submitted',
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    });
+    (db.verificationDocs[businessId] ??= []).insert(0, doc);
+    db.touch({DataDomain.business});
+    return doc;
+  }
+
+  @override
+  Future<String?> verificationFeedback(String businessId) async {
+    db.requireMember(businessId);
+    return db.businesses[businessId]?.verification == VerificationStatus.rejected ? db.verificationNotes[businessId] : null;
+  }
+
+  @override
+  Future<List<VerificationDocument>> verificationDocuments(String businessId) async {
+    db.requireMember(businessId);
+    await DemoBackend.latency(150);
+    return [...?db.verificationDocs[businessId]];
   }
 
   @override
   Future<void> submitForVerification(String businessId) async {
     db.requireMember(businessId);
-    if ((db.verificationDocs[businessId] ?? 0) == 0) throw const EvError('documents_required');
+    if ((db.verificationDocs[businessId] ?? const []).isEmpty) throw const EvError('documents_required');
     final biz = db.businesses[businessId]!;
     if (biz.verification == VerificationStatus.unverified || biz.verification == VerificationStatus.rejected) {
       db.businesses[businessId] = biz.copyWith(verification: VerificationStatus.pending);
@@ -1845,7 +1867,7 @@ class _DemoAdmin implements AdminApi {
               status: x.status,
               createdAt: x.createdAt ?? DateTime.now(),
               listings: db.listings.values.where((l) => l.businessId == x.id).length,
-              documents: db.verificationDocs[x.id] ?? (x.verification == VerificationStatus.pending ? 2 : 0),
+              documents: db.verificationDocs[x.id]?.length ?? (x.verification == VerificationStatus.pending ? 2 : 0),
             ))
         .toList()
       ..sort((a, b) => a.name.compareTo(b.name));
@@ -1857,6 +1879,7 @@ class _DemoAdmin implements AdminApi {
     await DemoBackend.latency(300);
     final x = db.businesses[businessId]!;
     db.businesses[businessId] = x.copyWith(verification: status);
+    status == VerificationStatus.rejected ? db.verificationNotes[businessId] = reason.trim() : db.verificationNotes.remove(businessId);
     db.writeAudit(role, 'business.verification', 'businesses', businessId, reason, {'verification_status': x.verification.wire}, {'verification_status': status.wire});
     db.notify(businessId, NotificationCategory.system,
         status == VerificationStatus.verified ? 'Your business is verified' : 'Verification updated', reason, 'verify:${status.name}:${DateTime.now().millisecondsSinceEpoch}',
@@ -1927,6 +1950,28 @@ class _DemoAdmin implements AdminApi {
         bookingReference: d.bookingReference, openedBy: d.openedBy, resolution: resolution);
     db.writeAudit(role, 'dispute.update', 'disputes', disputeId, resolution, {'status': d.status}, {'status': status});
     db.touch({DataDomain.admin});
+  }
+
+  @override
+  Future<void> takeDispute(String disputeId, {String? note}) async {
+    final role = _require('dispute.manage');
+    final d = db.disputes[disputeId]!;
+    if (!d.isOpen) throw const EvError('dispute_closed');
+    db.disputes[disputeId] = Dispute(id: d.id, bookingId: d.bookingId, reason: d.reason, status: 'investigating', createdAt: d.createdAt,
+        bookingReference: d.bookingReference, openedBy: d.openedBy, openedByBusinessId: d.openedByBusinessId, updatedAt: DateTime.now());
+    db.writeAudit(role, 'dispute.take', 'disputes', disputeId, note, {'status': d.status}, {'status': 'investigating'});
+    db.touch({DataDomain.admin});
+  }
+
+  @override
+  Future<void> ruleDispute(String disputeId, {required String decision, required String ruling, required String bookingOutcome}) async {
+    final role = _require('dispute.manage', reason: ruling, reasonRequired: true);
+    final d = db.disputes[disputeId]!;
+    if (!d.isOpen) throw const EvError('dispute_closed');
+    db.disputes[disputeId] = Dispute(id: d.id, bookingId: d.bookingId, reason: d.reason, status: decision, createdAt: d.createdAt,
+        bookingReference: d.bookingReference, openedBy: d.openedBy, openedByBusinessId: d.openedByBusinessId, resolution: ruling, updatedAt: DateTime.now());
+    db.writeAudit(role, 'dispute.rule', 'disputes', disputeId, ruling, {'status': d.status}, {'status': decision, 'outcome': bookingOutcome});
+    db.touch({DataDomain.admin, DataDomain.bookings});
   }
 
   @override

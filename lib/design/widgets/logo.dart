@@ -1,26 +1,27 @@
-import 'dart:ui' show PathMetric;
-
 import 'package:flutter/material.dart';
 
 import '../motion.dart';
 import '../theme.dart';
 import '../tokens.dart';
 
-/// The Evenda mark, drawn in code so it can animate. Geometry matches
-/// assets/brand/evenda_mark.svg: a forest "e" whose tail turns bronze and
-/// ends in a dot.
+/// The Evenda mark, drawn in code so it can animate. Same geometry as the app
+/// icon (tool/icon/evenda_icon.mjs, assets/brand/evenda_mark.svg): an "e" cut
+/// out of a disc, forest above the aperture and bronze below it.
 class EvendaMark extends StatefulWidget {
   const EvendaMark({super.key, this.size = 48, this.animate = false, this.onDark = false});
   final double size;
   final bool animate;
   final bool onDark;
 
+  /// Length of the launch animation (the launch screen waits for it).
+  static const introDuration = Duration(milliseconds: 1300);
+
   @override
   State<EvendaMark> createState() => _EvendaMarkState();
 }
 
 class _EvendaMarkState extends State<EvendaMark> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
+  late final _c = AnimationController(vsync: this, duration: EvendaMark.introDuration);
 
   @override
   void didChangeDependencies() {
@@ -53,49 +54,61 @@ class _MarkPainter extends CustomPainter {
   final double t;
   final bool onDark;
 
+  // Icon geometry (1024 canvas: R 270, counter 134, crossbar 62, aperture 62
+  // starting 44 left of centre) scaled so the disc fills the 120 box.
+  static const _k = 59 / 270;
+  static const _r = 270 * _k, _ri = 134 * _k, _y1 = 31 * _k, _slot = 62 * _k, _xs = -44 * _k;
+
+  /// The mark at a point of the intro: [counter] and [slot] run 0..1 as the
+  /// "e" is carved out of the disc (both 1 = the finished mark).
+  static Path _shape(double counter, double slot) {
+    const c = Offset(60, 60);
+    var p = Path()..addOval(Rect.fromCircle(center: c, radius: _r));
+    if (counter > 0) {
+      final ri = _ri * counter;
+      final cut = Path()
+        ..moveTo(c.dx - ri, c.dy - _y1)
+        ..arcToPoint(Offset(c.dx + ri, c.dy - _y1), radius: Radius.circular(ri))
+        ..close();
+      p = Path.combine(PathOperation.difference, p, cut);
+    }
+    if (slot > 0) {
+      // Slides in from beyond the right edge until it reaches its start point.
+      const end = 130.0, start = 60 + _xs;
+      final left = end - (end - start) * slot;
+      final cut = Path()..addRRect(RRect.fromLTRBR(left, c.dy + _y1, end + _slot, c.dy + _y1 + _slot, const Radius.circular(_slot / 2)));
+      p = Path.combine(PathOperation.difference, p, cut);
+    }
+    return p;
+  }
+
+  static final Path _final = _shape(1, 1);
+
   @override
   void paint(Canvas canvas, Size size) {
-    final s = size.width / 120;
-    canvas.scale(s);
+    canvas.scale(size.width / 120);
     final main = onDark ? EvColors.cream : EvColors.forest;
     final accent = onDark ? const Color(0xFFC9A27A) : EvColors.bronze;
-    Paint stroke(Color c) => Paint()
-      ..color = c
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
+    const split = 60 + _y1 + _slot; // bronze below the aperture
 
-    final e = Path()
-      ..moveTo(38, 56)
-      ..lineTo(90, 56)
-      ..arcToPoint(const Offset(56, 90), radius: const Radius.circular(34), largeArc: true, clockwise: false);
-    final tail = Path()
-      ..moveTo(56, 90)
-      ..lineTo(70, 90)
-      ..quadraticBezierTo(86, 90, 86, 74)
-      ..lineTo(86, 70);
+    // Starts as the plain disc the native splash shows, so the hand-off is
+    // seamless; then bronze rises, the counter opens, the aperture slides in.
+    double phase(double from, double to, Curve curve) => curve.transform(((t - from) / (to - from)).clamp(0.0, 1.0));
+    final rise = phase(0.0, 0.45, Curves.easeOutCubic);
+    final counter = phase(0.3, 0.7, Curves.easeOutBack);
+    final slot = phase(0.55, 0.95, Curves.easeOutCubic);
 
-    final p1 = Curves.easeInOutCubic.transform((t / 0.7).clamp(0, 1));
-    final p2 = Curves.easeOutCubic.transform(((t - 0.6) / 0.25).clamp(0, 1));
-    final p3 = EvMotion.spring.transform(((t - 0.8) / 0.2).clamp(0, 1));
-
-    void drawPartial(Path path, double frac, Paint paint) {
-      for (final PathMetric m in path.computeMetrics()) {
-        canvas.drawPath(m.extractPath(0, m.length * frac), paint);
-      }
-    }
-
-    drawPartial(e, p1, stroke(main));
-    if (p2 > 0) drawPartial(tail, p2, stroke(accent));
-    if (p3 > 0) canvas.drawCircle(const Offset(101, 92), 6.5 * p3, Paint()..color = accent);
+    canvas.clipPath(t >= 1 ? _final : _shape(counter.clamp(0.0, 1.08), slot));
+    canvas.drawRect(const Rect.fromLTRB(0, 0, 120, 120), Paint()..color = main);
+    final top = 120 - (120 - split) * rise;
+    canvas.drawRect(Rect.fromLTRB(0, top, 120, 120), Paint()..color = accent);
   }
 
   @override
   bool shouldRepaint(_MarkPainter old) => old.t != t || old.onDark != onDark;
 }
 
-/// Mark + wordmark. The "v" picks up the bronze accent.
+/// Mark + wordmark. The wordmark stays one colour; the mark carries the bronze.
 class EvendaLogo extends StatelessWidget {
   const EvendaLogo({super.key, this.size = 28, this.onDark = false});
   final double size;
@@ -104,16 +117,11 @@ class EvendaLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final main = onDark ? EvColors.cream : EvColors.forest;
-    final accent = onDark ? const Color(0xFFC9A27A) : EvColors.bronze;
     final style = EvType.title.copyWith(fontSize: size * 0.82, color: main, letterSpacing: 0.2, fontWeight: FontWeight.w600);
     return Row(mainAxisSize: MainAxisSize.min, children: [
       EvendaMark(size: size, onDark: onDark),
-      const SizedBox(width: 6),
-      Text.rich(TextSpan(style: style, children: [
-        const TextSpan(text: 'e'),
-        TextSpan(text: 'v', style: TextStyle(color: accent)),
-        const TextSpan(text: 'enda'),
-      ])),
+      SizedBox(width: size * 0.3),
+      Text('evenda', style: style),
     ]);
   }
 }

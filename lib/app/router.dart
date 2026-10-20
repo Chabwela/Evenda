@@ -6,6 +6,7 @@ import '../core/push.dart';
 import '../design/ev.dart';
 import '../features/admin/admin_console.dart';
 import '../features/admin/admin_business_review.dart';
+import '../features/admin/admin_dispute_case.dart';
 import '../features/admin/admin_login.dart';
 import '../features/auth/auth_screens.dart';
 import '../features/bookings/booking_detail.dart';
@@ -47,6 +48,7 @@ class _RouterRefresh extends ChangeNotifier {
     ref.listen(myBusinessProvider, (_, _) => notifyListeners());
     ref.listen(adminSessionProvider, (_, _) => notifyListeners());
     ref.listen(onboardingCelebrationProvider, (_, _) => notifyListeners());
+    ref.listen(launchIntroDoneProvider, (_, _) => notifyListeners());
   }
 }
 
@@ -72,6 +74,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final loc = state.matchedLocation;
       if (loc.startsWith('/admin')) return null; // the console checks its own access
+      if (loc == '/launch' && !ref.read(launchIntroDoneProvider)) return null; // let the mark finish
       final session = ref.read(sessionProvider);
       final business = ref.read(myBusinessProvider);
       final open = loc == '/welcome' || loc.startsWith('/auth');
@@ -150,6 +153,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       _r('/now/respond/:id', (s) => NowRespondScreen(id: s.pathParameters['id']!)),
       _r('/now/:id', (s) => NowLiveScreen(id: s.pathParameters['id']!)),
       _r('/admin/business/:id', (s) => AdminBusinessReviewScreen(id: s.pathParameters['id']!)),
+      _r('/admin/dispute/:id', (s) => AdminDisputeCaseScreen(id: s.pathParameters['id']!)),
       _r('/admin', (_) => const AdminConsoleScreen()),
       _r('/admin/login', (_) => const AdminLoginScreen()),
     ],

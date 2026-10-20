@@ -8,6 +8,7 @@ import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../design/ev.dart';
 import '../../domain/models.dart';
+import '../business/verification_docs.dart';
 import '../shared/map_widgets.dart';
 
 /// Business setup in six short steps. Progress is saved after every step
@@ -53,7 +54,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     'sat': '08:00-13:00',
     'sun': 'closed',
   };
-  int _docs = 0;
+  bool _uploading = false;
 
   void _load(Business? b) {
     if (_loaded) return;
@@ -141,6 +142,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ref.read(onboardingCelebrationProvider.notifier).set(true);
         try {
           await b.completeOnboarding(_bizId!);
+          // Documents sent during setup go to the review queue now, as the
+          // screen promised. Without this they sat unreviewed.
+          if ((await b.verificationDocuments(_bizId!)).isNotEmpty) await b.submitForVerification(_bizId!);
         } catch (_) {
           ref.read(onboardingCelebrationProvider.notifier).set(false);
           rethrow;
@@ -175,15 +179,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (path != null && mounted) setState(() => _logo = ref.read(backendProvider).photoUrl(path));
   }
 
-  Future<void> _uploadDoc(String type) async {
-    final doc = await pickDocument(context);
-    if (doc == null || !mounted || _bizId == null) return;
-    final ok = await guard(context, () async {
-      await ref.read(backendProvider).business.uploadVerificationDocument(_bizId!, type, doc.bytes, doc.ext);
-      return true;
-    }, success: 'Document uploaded');
-    if (ok == true && mounted) setState(() => _docs++);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -258,10 +253,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           padding: EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, EvSpace.x3 + MediaQuery.paddingOf(context).bottom),
           child: Row(children: [
             if (_step == 5) ...[
-              Expanded(child: EvButton('Skip for now', kind: EvButtonKind.quiet, onPressed: _busy ? null : _next)),
+              Expanded(child: EvButton('Skip for now', kind: EvButtonKind.quiet, onPressed: _busy || _uploading ? null : _next)),
               const SizedBox(width: 12),
             ],
-            Expanded(flex: 2, child: EvButton(_step == 5 ? 'Finish setup' : 'Continue', loading: _busy, expand: true, onPressed: _next)),
+            // Not while a document is still uploading: leaving would hide whether it arrived.
+            Expanded(flex: 2, child: EvButton(_step == 5 && _uploading ? 'Uploading…' : _step == 5 ? 'Finish setup' : 'Continue', loading: _busy, expand: true, onPressed: _uploading ? null : _next)),
           ]),
         ),
       ),
@@ -428,23 +424,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         return [
           Text('Verified businesses show a badge and rank higher in supplier search. Upload a document now or later from Business → Profile.', style: EvType.small),
           const SizedBox(height: EvSpace.x4),
-          for (final (type, label, hint) in const [
-            ('pacra_certificate', 'PACRA certificate', 'Certificate of incorporation or business name registration'),
-            ('tpin', 'ZRA TPIN certificate', 'Tax registration'),
-            ('national_id', 'Owner’s NRC', 'National registration card of the owner'),
-          ]) ...[
-            EvSurface(
-              padding: EdgeInsets.zero,
-              child: EvRow(
-                leading: const IconTile(LucideIcons.fileText),
-                title: label,
-                subtitle: hint,
-                trailing: EvButton('Upload', kind: EvButtonKind.secondary, compact: true, onPressed: () => _uploadDoc(type)),
-              ),
-            ),
-            const SizedBox(height: EvSpace.x2),
+          // The business exists by now: every earlier step saves it.
+          if (_bizId != null) ...[
+            VerificationDocsSection(businessId: _bizId!, onBusyChanged: (v) => setState(() => _uploading = v)),
+            const SizedBox(height: EvSpace.x3),
+            if ((ref.watch(verificationDocsProvider(_bizId!)).value ?? const []).isNotEmpty)
+              Text('The Evenda team reviews your documents once you finish setup.', style: EvType.small),
           ],
-          if (_docs > 0) Text('$_docs document${_docs == 1 ? '' : 's'} uploaded. We’ll review after you finish setup.', style: EvType.small.copyWith(color: EvColors.success)),
         ];
     }
   }

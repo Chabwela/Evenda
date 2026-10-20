@@ -142,6 +142,8 @@ class EvField extends StatelessWidget {
     this.maxLength,
     this.onSubmitted,
     this.textCapitalization = TextCapitalization.sentences,
+    this.autofillHints,
+    this.autocorrect = true,
   });
 
   final String label;
@@ -165,6 +167,8 @@ class EvField extends StatelessWidget {
   final int? maxLength;
   final ValueChanged<String>? onSubmitted;
   final TextCapitalization textCapitalization;
+  final Iterable<String>? autofillHints;
+  final bool autocorrect;
 
   @override
   Widget build(BuildContext context) {
@@ -187,6 +191,9 @@ class EvField extends StatelessWidget {
           maxLength: maxLength,
           onFieldSubmitted: onSubmitted,
           textCapitalization: textCapitalization,
+          autofillHints: autofillHints,
+          autocorrect: autocorrect,
+          enableSuggestions: autocorrect,
           style: EvType.body,
           autovalidateMode: AutovalidateMode.onUserInteraction,
           decoration: InputDecoration(

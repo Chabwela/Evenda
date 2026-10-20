@@ -15,9 +15,66 @@ final _detailProvider = FutureProvider.autoDispose.family<AdminBusinessDetail, S
   return ref.watch(backendProvider).admin.businessDetail(id);
 });
 
-/// Admin review of one business: who runs it, how to reach them, what they
-/// submitted, and every decision taken so far. Verification is a two-step
-/// judgement: open and accept (or reject) the documents, then decide.
+/// Where a verification stands, from the admin's side: whose move it is.
+enum _Stage {
+  notSubmitted('Not sent for review yet', Tone.neutral),
+  toReview('Documents to review', Tone.waiting),
+  readyToVerify('Ready to verify', Tone.positive),
+  waitingVendor('Waiting for the vendor', Tone.progress),
+  sentBack('Sent back to the vendor', Tone.critical),
+  verified('Verified business', Tone.positive);
+
+  const _Stage(this.label, this.tone);
+  final String label;
+  final Tone tone;
+}
+
+/// Documents grouped for review: the newest upload of each type is what's
+/// being judged; older ones (replaced or turned down) are history.
+class _Docs {
+  _Docs(List<AdminDocument> all) {
+    final sorted = [...all]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    for (final d in sorted) {
+      if (current.any((c) => c.docType == d.docType)) {
+        earlier.add(d);
+      } else {
+        current.add(d);
+      }
+    }
+  }
+  final current = <AdminDocument>[];
+  final earlier = <AdminDocument>[];
+
+  /// A newer upload of a type that already had one (the vendor replaced it).
+  bool isReplacement(AdminDocument d) => earlier.any((e) => e.docType == d.docType);
+  int get toReview => current.where((d) => d.status == 'submitted').length;
+}
+
+_Stage _stageOf(AdminBusinessDetail d, _Docs docs) => switch (d.verification) {
+      VerificationStatus.verified => _Stage.verified,
+      VerificationStatus.rejected => _Stage.sentBack,
+      VerificationStatus.unverified => _Stage.notSubmitted,
+      VerificationStatus.pending when docs.toReview > 0 => _Stage.toReview,
+      VerificationStatus.pending when d.hasAcceptedDocument => _Stage.readyToVerify,
+      VerificationStatus.pending when docs.current.isNotEmpty => _Stage.waitingVendor,
+      VerificationStatus.pending => _Stage.notSubmitted,
+    };
+
+/// The last reason given when verification was sent back (from the audit trail).
+String? _lastSendBackReason(AdminBusinessDetail d) {
+  for (final h in d.history) {
+    if (h['action'] == 'business.verification' && (h['after'] as Map?)?['verification_status'] == 'rejected') {
+      final r = '${h['reason'] ?? ''}'.trim();
+      return r.isEmpty ? null : r;
+    }
+  }
+  return null;
+}
+
+/// Admin review of one business. It answers "whose move is it?" first, puts
+/// the documents being judged next (the newest of each type; replaced ones
+/// fold away), then who the business is. Verification is two steps: accept
+/// (or reject) the documents, then verify or send it back to the vendor.
 class AdminBusinessReviewScreen extends ConsumerWidget {
   const AdminBusinessReviewScreen({super.key, required this.id});
   final String id;
@@ -26,16 +83,86 @@ class AdminBusinessReviewScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(_detailProvider(id));
     final role = ref.watch(adminSessionProvider).value?.role ?? ref.watch(backendProvider).admin.current?.role;
+    final canVerify = role?.can('business.verify') ?? false;
+    final d = detail.value;
+    void changed() => ref.invalidate(_detailProvider(id));
     return Scaffold(
-      appBar: AppBar(title: const Text('Business review'), centerTitle: false),
+      appBar: AppBar(
+        title: const Text('Business review'),
+        centerTitle: false,
+        actions: [if (d != null && canVerify) _MoreMenu(d: d, onChanged: changed)],
+      ),
       body: AsyncView<AdminBusinessDetail>(
         value: detail,
-        onRetry: () => ref.invalidate(_detailProvider(id)),
-        data: (d) => _Body(d: d, canVerify: role?.can('business.verify') ?? false, onChanged: () => ref.invalidate(_detailProvider(id))),
+        onRetry: changed,
+        data: (d) => _Body(d: d, canVerify: canVerify, onChanged: changed),
       ),
-      bottomNavigationBar: detail.value == null || !(role?.can('business.verify') ?? false)
-          ? null
-          : _DecisionBar(d: detail.value!, onChanged: () => ref.invalidate(_detailProvider(id))),
+      bottomNavigationBar: d == null || !canVerify ? null : _DecisionBar(d: d, onChanged: changed),
+    );
+  }
+}
+
+/// Verify or send back, with the reason the vendor will see.
+Future<void> _setVerification(BuildContext context, WidgetRef ref, AdminBusinessDetail d, VerificationStatus s, VoidCallback onChanged) async {
+  final verify = s == VerificationStatus.verified;
+  final revoke = d.verification == VerificationStatus.verified && !verify;
+  final reason = await confirmWithReason(
+    context,
+    title: verify ? 'Verify ${d.name}?' : (revoke ? 'Revoke verification?' : 'Send back to the vendor?'),
+    body: verify
+        ? 'Other vendors will see the verified badge. The business is notified and your note goes in the audit log.'
+        : 'Say what to fix. The vendor sees this on their profile and can upload new documents and send it again.',
+    confirm: verify ? 'Verify' : (revoke ? 'Revoke' : 'Send back'),
+    required: !verify,
+    destructive: !verify,
+  );
+  if (reason == null || !context.mounted) return;
+  final ok = await guard(context, () async {
+    await ref.read(backendProvider).admin.setVerification(d.id, s, reason);
+    return true;
+  }, success: verify ? 'Business verified' : 'Sent back to the vendor');
+  if (ok == true) onChanged();
+}
+
+/// Rare, serious actions live here, away from the everyday decision.
+class _MoreMenu extends ConsumerWidget {
+  const _MoreMenu({required this.d, required this.onChanged});
+  final AdminBusinessDetail d;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final suspended = d.status == BusinessStatus.suspended;
+    Future<void> setStatus() async {
+      final reason = await confirmWithReason(
+        context,
+        title: suspended ? 'Reactivate ${d.name}?' : 'Suspend ${d.name}?',
+        body: suspended ? 'They can list, quote and book again.' : 'Their listings disappear from search and they cannot transact until reactivated.',
+        confirm: suspended ? 'Reactivate' : 'Suspend',
+        destructive: !suspended,
+      );
+      if (reason == null || !context.mounted) return;
+      final ok = await guard(context, () async {
+        await ref.read(backendProvider).admin.setBusinessStatus(d.id, suspended ? BusinessStatus.active : BusinessStatus.suspended, reason);
+        return true;
+      }, success: suspended ? 'Account reactivated' : 'Account suspended');
+      if (ok == true) onChanged();
+    }
+
+    return PopupMenuButton<String>(
+      tooltip: 'More actions',
+      icon: const Icon(LucideIcons.ellipsisVertical),
+      onSelected: (v) => switch (v) {
+        'revoke' => _setVerification(context, ref, d, VerificationStatus.rejected, onChanged),
+        _ => setStatus(),
+      },
+      itemBuilder: (_) => [
+        if (d.verification == VerificationStatus.verified) const PopupMenuItem(value: 'revoke', child: Text('Revoke verification')),
+        PopupMenuItem(
+          value: 'status',
+          child: Text(suspended ? 'Reactivate account' : 'Suspend account', style: TextStyle(color: suspended ? EvColors.ink : EvColors.danger)),
+        ),
+      ],
     );
   }
 }
@@ -51,54 +178,70 @@ class _Body extends ConsumerWidget {
     final backend = ref.read(backendProvider);
     final owner = d.owner;
     final c = d.counts;
-    String n(String k) => '${(c[k] as num?)?.toInt() ?? 0}';
+    int n(String k) => (c[k] as num?)?.toInt() ?? 0;
+    final docs = _Docs(d.documents);
+    final stage = _stageOf(d, docs);
+    final sentBackReason = stage == _Stage.sentBack ? _lastSendBackReason(d) : null;
 
+    const section = EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2);
     return ListView(padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, EvSpace.x10), children: [
       // Identity
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        BusinessAvatar(name: d.name, logoUrl: d.logoPath == null ? null : backend.photoUrl(d.logoPath!), size: 64, verified: d.verification == VerificationStatus.verified),
-        const SizedBox(width: EvSpace.x4),
+        BusinessAvatar(name: d.name, logoUrl: d.logoPath == null ? null : backend.photoUrl(d.logoPath!), size: 56, verified: d.verification == VerificationStatus.verified),
+        const SizedBox(width: EvSpace.x3),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(d.name, style: EvType.title),
-            const SizedBox(height: 4),
-            Text('${categoryById(d.primaryCategory).name} · ${d.neighbourhood ?? 'No area set'}', style: EvType.small),
-            const SizedBox(height: 8),
-            Wrap(spacing: 6, runSpacing: 6, children: [
-              StatusPill(d.verification.label, tone: toneForVerification(d.verification), dense: true),
-              if (d.status == BusinessStatus.suspended) const StatusPill('Suspended', tone: Tone.critical, dense: true),
-              if (!d.onboarded) const StatusPill('Onboarding unfinished', tone: Tone.waiting, dense: true),
-            ]),
+            const SizedBox(height: 2),
+            Text('${categoryById(d.primaryCategory).name} · ${d.neighbourhood ?? 'No area set'} · joined ${EvDates.dayShort(d.createdAt)}', style: EvType.small),
+            if (d.status == BusinessStatus.suspended || !d.onboarded) ...[
+              const SizedBox(height: 6),
+              Wrap(spacing: 6, runSpacing: 6, children: [
+                if (d.status == BusinessStatus.suspended) const StatusPill('Suspended', tone: Tone.critical, dense: true),
+                if (!d.onboarded) const StatusPill('Onboarding unfinished', tone: Tone.waiting, dense: true),
+              ]),
+            ],
           ]),
         ),
       ]),
-      if (d.description.isNotEmpty) ...[const SizedBox(height: EvSpace.x4), Text(d.description, style: EvType.body)],
+
+      // Whose move it is, in one line.
+      const SizedBox(height: EvSpace.x4),
+      _StageLine(stage: stage, docs: docs, sentBackReason: sentBackReason),
+      if (d.description.isNotEmpty) ...[const SizedBox(height: EvSpace.x4), Text(d.description, style: EvType.body.copyWith(color: EvColors.ink2))],
 
       // Documents first: this is what the admin is here to judge.
-      SectionHeader('Verification documents', count: d.documents.length, padding: const EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
-      if (d.documents.isEmpty)
-        EvSurface(
-          color: EvColors.warningTint,
-          child: Text('No documents uploaded. The business cannot be verified until it submits a PACRA certificate, TPIN or ID.',
-              style: EvType.small.copyWith(color: EvColors.warning)),
-        )
+      SectionHeader('Documents', count: docs.current.length, padding: section),
+      if (docs.current.isEmpty)
+        Text('No documents uploaded yet. The business can’t be verified until it sends a PACRA certificate, TPIN or ID.', style: EvType.small)
       else
-        for (final doc in d.documents) ...[
-          _DocumentCard(doc: doc, canReview: canVerify, onChanged: onChanged),
+        for (final doc in docs.current) ...[
+          _DocumentCard(doc: doc, replacement: docs.isReplacement(doc), canReview: canVerify, onChanged: onChanged),
           const SizedBox(height: EvSpace.x2),
         ],
+      if (docs.earlier.isNotEmpty) _EarlierUploads(docs: docs.earlier),
+
+      // Activity: what the business has done on Evenda, on the page.
+      const SectionHeader('Activity', padding: section),
+      EvStatRow(padding: EdgeInsets.zero, stats: [
+        EvStat('Listings · ${n('published_listings')} live', '${n('listings')}'),
+        EvStat('Bookings · supplier / hirer', '${n('bookings_as_supplier')} / ${n('bookings_as_requester')}'),
+        EvStat('Disputes', '${n('disputes')}', alert: n('disputes') > 0),
+      ]),
+      if (n('flagged_listings') > 0)
+        Padding(
+          padding: const EdgeInsets.only(top: EvSpace.x2),
+          child: Text('${plural(n('flagged_listings'), 'listing')} under moderation', style: EvType.small.copyWith(color: EvColors.danger)),
+        ),
 
       // Owner and contact
-      const SectionHeader('Owner & contact', padding: EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
+      const SectionHeader('Owner & contact', padding: section),
       EvSurface(
         padding: EdgeInsets.zero,
         child: Column(children: [
           _Fact(LucideIcons.user, 'Owner', '${owner['name'] ?? ''}'.isEmpty ? '—' : owner['name']),
           _Fact(LucideIcons.atSign, 'Account email', '${owner['email'] ?? '—'}',
-              badge: owner['email_confirmed'] == true
-                  ? const StatusPill('Confirmed', tone: Tone.positive, dense: true, icon: LucideIcons.check)
-                  : const StatusPill('Not confirmed', tone: Tone.waiting, dense: true)),
-          if (owner['joined_at'] != null) _Fact(LucideIcons.calendarClock, 'Joined', EvDates.day(DateTime.parse(owner['joined_at']).toLocal())),
+              note: owner['email_confirmed'] == true ? ('Confirmed', EvColors.success) : ('Not confirmed', EvColors.warning)),
           _Fact(LucideIcons.phone, 'Business phone', ZambianPhone.display(d.phone).isEmpty ? '—' : ZambianPhone.display(d.phone),
               action: d.phone == null ? null : () => launchUrl(Uri.parse('tel:${d.phone}'))),
           _Fact(LucideIcons.messageCircle, 'WhatsApp', ZambianPhone.display(d.whatsapp).isEmpty ? '—' : ZambianPhone.display(d.whatsapp),
@@ -106,62 +249,28 @@ class _Body extends ConsumerWidget {
                   ? null
                   : () => launchUrl(Uri.parse('https://wa.me/${ZambianPhone.waDigits(d.whatsapp!)}?text=${Uri.encodeComponent('Hello from the Evenda team about ${d.name}.')}'),
                       mode: LaunchMode.externalApplication)),
-          if (d.email != null)
+          if (d.email != null && d.email != owner['email'])
             _Fact(LucideIcons.mail, 'Business email', d.email!, action: () => launchUrl(Uri.parse('mailto:${d.email}?subject=${Uri.encodeComponent('Evenda: ${d.name}')}'))),
+          _Fact(LucideIcons.mapPin, 'Location', [d.neighbourhood, d.addressLine, 'serves ${d.serviceRadiusKm} km'].whereType<String>().where((s) => s.isNotEmpty).join(' · '),
+              action: d.lat == null
+                  ? null
+                  : () => launchUrl(Uri.parse('https://www.google.com/maps/search/?api=1&query=${d.lat},${d.lng}'), mode: LaunchMode.externalApplication)),
+          for (final t in d.team.where((t) => t['role'] != 'owner'))
+            _Fact(LucideIcons.users, 'Team · ${'${t['role']}'.capitalized}', '${t['name'] ?? ''}'.ifEmpty('Invited member')),
         ]),
       ),
 
-      // Location
-      const SectionHeader('Location', padding: EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
-      EvSurface(
-        padding: EdgeInsets.zero,
-        child: Column(children: [
-          _Fact(LucideIcons.mapPin, 'Area', [d.neighbourhood, d.addressLine].whereType<String>().where((s) => s.isNotEmpty).join(' · ').ifEmpty('—')),
-          _Fact(LucideIcons.radar, 'Serves within', '${d.serviceRadiusKm} km'),
-          if (d.lat != null)
-            _Fact(LucideIcons.crosshair, 'Exact pin', '${d.lat!.toStringAsFixed(5)}, ${d.lng!.toStringAsFixed(5)}',
-                action: () => launchUrl(Uri.parse('https://www.google.com/maps/search/?api=1&query=${d.lat},${d.lng}'), mode: LaunchMode.externalApplication)),
-        ]),
-      ),
-
-      // Activity
-      const SectionHeader('Activity', padding: EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        _Count('Listings', n('listings'), sub: '${n('published_listings')} published'),
-        _Count('Bookings as supplier', n('bookings_as_supplier')),
-        _Count('Bookings as hirer', n('bookings_as_requester')),
-        _Count('Disputes', n('disputes'), alert: n('disputes') != '0'),
-        _Count('Moderated listings', n('flagged_listings'), alert: n('flagged_listings') != '0'),
-      ]),
-
-      if (d.team.isNotEmpty) ...[
-        SectionHeader('Team', count: d.team.length, padding: const EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
-        EvSurface(
-          padding: EdgeInsets.zero,
-          child: Column(children: [
-            for (final t in d.team)
-              _Fact(LucideIcons.users, '${t['role']}'.capitalized, '${t['name'] ?? ''}'.ifEmpty('Invited member')),
-          ]),
-        ),
-      ],
-
-      SectionHeader('Decision history', count: d.history.length, padding: const EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
+      SectionHeader('Decision history', count: d.history.length, padding: section),
       if (d.history.isEmpty)
         Text('No admin decisions yet.', style: EvType.small)
       else
         for (final h in d.history)
           Padding(
             padding: const EdgeInsets.only(bottom: EvSpace.x3),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Padding(padding: EdgeInsets.only(top: 2), child: Icon(LucideIcons.history, size: 15, color: EvColors.ink3)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(_historyLabel(h), style: EvType.smallStrong),
-                  if ('${h['reason'] ?? ''}'.isNotEmpty) Text('“${h['reason']}”', style: EvType.small),
-                  Text('${'${h['by'] ?? ''}'.ifEmpty('Admin')} · ${EvDates.dayTime(DateTime.parse(h['at']).toLocal())}', style: EvType.caption),
-                ]),
-              ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_historyLabel(h), style: EvType.smallStrong),
+              if ('${h['reason'] ?? ''}'.isNotEmpty) Text('“${h['reason']}”', style: EvType.small),
+              Text('${'${h['by'] ?? ''}'.ifEmpty('Admin')} · ${EvDates.dayTime(DateTime.parse(h['at']).toLocal())}', style: EvType.caption),
             ]),
           ),
     ]);
@@ -170,17 +279,53 @@ class _Body extends ConsumerWidget {
   static String _historyLabel(Map<String, dynamic> h) {
     final after = (h['after'] as Map?) ?? const {};
     return switch (h['action']) {
-      'business.verification' => 'Verification set to ${'${after['verification_status']}'.replaceAll('_', ' ')}',
+      'business.verification' => switch ('${after['verification_status']}') {
+          'verified' => 'Verified',
+          'rejected' => 'Sent back to the vendor',
+          final v => 'Verification set to ${v.replaceAll('_', ' ')}',
+        },
       'business.status' => 'Account ${after['status'] == 'suspended' ? 'suspended' : 'reactivated'}',
       'document.review' => 'Document ${after['status']}',
+      'payment.void' => 'Payment record voided',
       final a => '$a',
     };
   }
 }
 
+/// "Whose move is it?" in one quiet line, with the reason when sent back.
+class _StageLine extends StatelessWidget {
+  const _StageLine({required this.stage, required this.docs, this.sentBackReason});
+  final _Stage stage;
+  final _Docs docs;
+  final String? sentBackReason;
+
+  @override
+  Widget build(BuildContext context) {
+    final detail = switch (stage) {
+      _Stage.toReview => '${plural(docs.toReview, 'document')} waiting for you. Open each one before you accept it.',
+      _Stage.readyToVerify => 'A document is accepted. Verify the business, or send it back.',
+      _Stage.waitingVendor =>
+        '${docs.current.length == 1 ? 'The document was rejected' : 'All current documents were rejected'}. The vendor is asked to upload a replacement; it will appear here.',
+      _Stage.sentBack => sentBackReason == null ? 'They can upload new documents and send it again.' : '“$sentBackReason” They can fix it and send it again.',
+      _Stage.verified => 'Shown with the verified badge.',
+      _Stage.notSubmitted => docs.current.isEmpty ? 'No documents yet.' : 'The vendor hasn’t sent it for review.',
+    };
+    return Container(
+      padding: const EdgeInsets.only(left: EvSpace.x3),
+      decoration: BoxDecoration(border: Border(left: BorderSide(color: stage.tone == Tone.neutral ? EvColors.sandDeep : stage.tone.fg, width: 3))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(stage.label, style: EvType.bodyStrong.copyWith(color: stage.tone == Tone.neutral ? EvColors.ink : stage.tone.fg)),
+        const SizedBox(height: 2),
+        Text(detail, style: EvType.small),
+      ]),
+    );
+  }
+}
+
 class _DocumentCard extends ConsumerStatefulWidget {
-  const _DocumentCard({required this.doc, required this.canReview, required this.onChanged});
+  const _DocumentCard({required this.doc, required this.replacement, required this.canReview, required this.onChanged});
   final AdminDocument doc;
+  final bool replacement;
   final bool canReview;
   final VoidCallback onChanged;
 
@@ -193,14 +338,8 @@ class _DocumentCardState extends ConsumerState<_DocumentCard> {
 
   Future<void> _open() async {
     setState(() => _opening = true);
-    final url = await guard(context, () => ref.read(backendProvider).admin.documentUrl(widget.doc.storagePath));
+    await _openDocument(context, ref, widget.doc);
     if (mounted) setState(() => _opening = false);
-    if (url == null || !mounted) return;
-    if (!widget.doc.viewInApp) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    } else {
-      await Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => _ImageViewer(url: url, title: widget.doc.typeLabel)));
-    }
   }
 
   Future<void> _review(String status) async {
@@ -210,7 +349,7 @@ class _DocumentCardState extends ConsumerState<_DocumentCard> {
       title: accepting ? 'Accept this ${widget.doc.typeLabel}?' : 'Reject this ${widget.doc.typeLabel}?',
       body: accepting
           ? 'Only accept it if you opened it and it is genuine, legible, current and matches this business. Add a note (optional).'
-          : 'Say what is wrong so the vendor can fix it, e.g. "Blurry, name not readable" or "Registered name does not match".',
+          : 'Say what is wrong so the vendor can fix it, e.g. "Blurry, name not readable" or "Registered name does not match". They are asked for a replacement.',
       confirm: accepting ? 'Accept' : 'Reject',
       required: !accepting,
       destructive: !accepting,
@@ -219,59 +358,109 @@ class _DocumentCardState extends ConsumerState<_DocumentCard> {
     final ok = await guard(context, () async {
       await ref.read(backendProvider).admin.reviewDocument(widget.doc.id, status, note);
       return true;
-    }, success: accepting ? 'Document accepted' : 'Document rejected');
+    }, success: accepting ? 'Document accepted' : 'Vendor asked for a replacement');
     if (ok == true) widget.onChanged();
   }
 
   @override
   Widget build(BuildContext context) {
     final doc = widget.doc;
+    final undecided = doc.status == 'submitted';
     final (label, tone) = switch (doc.status) {
       'accepted' => ('Accepted', Tone.positive),
       'rejected' => ('Rejected', Tone.critical),
-      _ => ('Not reviewed', Tone.waiting),
+      _ => (widget.replacement ? 'Replacement' : 'To review', Tone.waiting),
     };
     return EvSurface(
+      padding: const EdgeInsets.fromLTRB(EvSpace.x4, EvSpace.x3, EvSpace.x3, EvSpace.x3),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          IconTile(doc.viewInApp ? LucideIcons.fileImage : LucideIcons.fileText),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(doc.typeLabel, style: EvType.bodyStrong),
-              Text('Uploaded ${EvDates.day(doc.createdAt)} · ${doc.formatLabel}', style: EvType.caption),
-            ]),
-          ),
-          StatusPill(label, tone: tone, dense: true),
-        ]),
+        InkWell(
+          onTap: _opening ? null : _open,
+          child: Row(children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(doc.typeLabel, style: EvType.bodyStrong),
+                Text('${doc.formatLabel} · uploaded ${EvDates.dayShort(doc.createdAt)}', style: EvType.caption),
+              ]),
+            ),
+            StatusPill(label, tone: tone, dense: true),
+          ]),
+        ),
         if (doc.reviewNote != null || doc.reviewedAt != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             [
               if (doc.reviewNote != null) '“${doc.reviewNote}”',
-              if (doc.reviewedAt != null) '${(doc.reviewedBy ?? '').ifEmpty('Admin')}, ${EvDates.day(doc.reviewedAt!)}',
-            ].join(' — '),
+              if (doc.reviewedAt != null) '${(doc.reviewedBy ?? '').ifEmpty('Admin')}, ${EvDates.dayShort(doc.reviewedAt!)}',
+            ].join(' · '),
             style: EvType.caption,
           ),
         ],
-        const SizedBox(height: EvSpace.x3),
-        EvButton(doc.viewInApp ? 'View document' : 'Open ${doc.formatLabel}', kind: EvButtonKind.secondary, icon: LucideIcons.eye, expand: true, loading: _opening, onPressed: _open),
-        if (widget.canReview) ...[
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(
-              child: EvButton('Reject', kind: EvButtonKind.danger, icon: LucideIcons.x, expand: true,
-                  onPressed: doc.status == 'rejected' ? null : () => _review('rejected')),
+        const SizedBox(height: EvSpace.x2),
+        // Open is always first: nothing is judged unseen. Wraps onto a second
+        // line on narrow phones / large text instead of overflowing.
+        OverflowBar(alignment: MainAxisAlignment.spaceBetween, overflowAlignment: OverflowBarAlignment.end, overflowSpacing: 4, spacing: 8, children: [
+          TextButton.icon(
+            onPressed: _opening ? null : _open,
+            icon: _opening ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(LucideIcons.eye, size: 18),
+            label: Text(doc.viewInApp ? 'Open' : 'Open ${doc.formatLabel}'),
+          ),
+          if (widget.canReview && undecided)
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              EvButton('Reject', kind: EvButtonKind.quiet, compact: true, onPressed: () => _review('rejected')),
+              const SizedBox(width: 6),
+              EvButton('Accept', compact: true, icon: LucideIcons.check, onPressed: () => _review('accepted')),
+            ])
+          else if (widget.canReview)
+            TextButton(
+              onPressed: () => _review(doc.status == 'accepted' ? 'rejected' : 'accepted'),
+              child: Text(doc.status == 'accepted' ? 'Withdraw acceptance' : 'Accept instead'),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: EvButton('Accept', icon: LucideIcons.check, expand: true, onPressed: doc.status == 'accepted' ? null : () => _review('accepted')),
-            ),
-          ]),
-        ],
+        ]),
       ]),
     );
   }
+}
+
+/// Opens a document: photos in the zoomable viewer, PDF/Word in the phone's app.
+Future<void> _openDocument(BuildContext context, WidgetRef ref, AdminDocument doc) async {
+  final url = await guard(context, () => ref.read(backendProvider).admin.documentUrl(doc.storagePath));
+  if (url == null || !context.mounted) return;
+  if (!doc.viewInApp) {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  } else {
+    await Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => _ImageViewer(url: url, title: doc.typeLabel)));
+  }
+}
+
+/// Replaced and turned-down uploads, folded away but one tap from view.
+class _EarlierUploads extends ConsumerWidget {
+  const _EarlierUploads({required this.docs});
+  final List<AdminDocument> docs;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: EdgeInsets.zero,
+          title: Text('Earlier uploads (${docs.length})', style: EvType.smallStrong),
+          children: [
+            for (final doc in docs)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                onTap: () => _openDocument(context, ref, doc),
+                title: Text('${doc.typeLabel} · ${EvDates.dayShort(doc.createdAt)}', style: EvType.small.copyWith(color: EvColors.ink)),
+                subtitle: Text(
+                  [doc.status == 'rejected' ? 'Rejected' : (doc.status == 'accepted' ? 'Accepted' : 'Not reviewed'), if (doc.reviewNote != null) '“${doc.reviewNote}”'].join(' · '),
+                  style: EvType.caption,
+                ),
+                trailing: const Icon(LucideIcons.eye, size: 16, color: EvColors.ink3),
+              ),
+          ],
+        ),
+      );
 }
 
 /// Full-screen, zoomable document photo. Pinch to read small print.
@@ -300,7 +489,8 @@ class _ImageViewer extends StatelessWidget {
       );
 }
 
-/// Verify / reject / suspend, pinned to the bottom of the review.
+/// The everyday decision, pinned and slim: verify, or send it back with a
+/// reason. Shown only when there's a decision to make.
 class _DecisionBar extends ConsumerWidget {
   const _DecisionBar({required this.d, required this.onChanged});
   final AdminBusinessDetail d;
@@ -308,118 +498,27 @@ class _DecisionBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final api = ref.read(backendProvider).admin;
-    final verified = d.verification == VerificationStatus.verified;
-    final suspended = d.status == BusinessStatus.suspended;
-
-    Future<void> setVerification(VerificationStatus s) async {
-      final reason = await confirmWithReason(
-        context,
-        title: s == VerificationStatus.verified ? 'Verify ${d.name}?' : 'Reject verification?',
-        body: s == VerificationStatus.verified
-            ? 'Other vendors will see the verified badge. The business is notified and your note goes in the audit log.'
-            : 'The business is notified with your reason so they can upload better documents.',
-        confirm: s == VerificationStatus.verified ? 'Verify' : 'Reject',
-        required: s != VerificationStatus.verified,
-        destructive: s != VerificationStatus.verified,
-      );
-      if (reason == null || !context.mounted) return;
-      final ok = await guard(context, () async {
-        await api.setVerification(d.id, s, reason);
-        return true;
-      }, success: 'Recorded in audit log');
-      if (ok == true) onChanged();
-    }
-
-    Future<void> setStatus() async {
-      final reason = await confirmWithReason(
-        context,
-        title: suspended ? 'Reactivate ${d.name}?' : 'Suspend ${d.name}?',
-        body: suspended ? 'They can list, quote and book again.' : 'Their listings disappear from search and they cannot transact until reactivated.',
-        confirm: suspended ? 'Reactivate' : 'Suspend',
-        destructive: !suspended,
-      );
-      if (reason == null || !context.mounted) return;
-      final ok = await guard(context, () async {
-        await api.setBusinessStatus(d.id, suspended ? BusinessStatus.active : BusinessStatus.suspended, reason);
-        return true;
-      }, success: 'Recorded in audit log');
-      if (ok == true) onChanged();
-    }
-
-    final accepted = d.documents.where((x) => x.status == 'accepted').length;
-    final total = d.documents.length;
-    final canVerify = !verified && d.hasAcceptedDocument;
-    final (stateText, stateTone) = switch (d.verification) {
-      VerificationStatus.verified => ('Verified business', Tone.positive),
-      VerificationStatus.rejected => ('Verification rejected', Tone.critical),
-      VerificationStatus.pending => ('Waiting for your decision', Tone.waiting),
-      VerificationStatus.unverified => ('Not submitted for verification', Tone.neutral),
-    };
-
+    final stage = _stageOf(d, _Docs(d.documents));
+    if (stage == _Stage.verified || stage == _Stage.sentBack || stage == _Stage.notSubmitted) return const SizedBox.shrink();
+    final canVerify = d.hasAcceptedDocument;
     return Container(
-      decoration: BoxDecoration(
-        color: EvColors.warmWhite,
-        border: const Border(top: BorderSide(color: EvColors.sand)),
-        boxShadow: [BoxShadow(color: EvColors.ink.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, -4))],
-      ),
+      decoration: const BoxDecoration(color: EvColors.cream, border: Border(top: BorderSide(color: EvColors.hairline))),
       padding: EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, EvSpace.x3 + MediaQuery.paddingOf(context).bottom),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        // Where the review stands.
-        Row(children: [
-          Icon(verified ? LucideIcons.badgeCheck : LucideIcons.shieldQuestion, size: 18, color: stateTone == Tone.neutral ? EvColors.ink2 : stateTone.fg),
-          const SizedBox(width: 8),
-          Expanded(child: Text(stateText, style: EvType.smallStrong)),
-          if (suspended) const StatusPill('Suspended', tone: Tone.critical, dense: true),
-        ]),
-        if (total > 0) ...[
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: accepted / total,
-                  minHeight: 6,
-                  backgroundColor: EvColors.sand,
-                  color: accepted > 0 ? EvColors.success : EvColors.sandDeep,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text('$accepted of $total document${total == 1 ? '' : 's'} accepted', style: EvType.caption),
-          ]),
-        ],
-        const SizedBox(height: EvSpace.x3),
-
-        // The decision. Locked until a document has been accepted.
-        if (!verified)
-          EvButton(
-            canVerify ? 'Verify business' : (total == 0 ? 'No documents to review' : 'Accept a document to unlock'),
-            icon: canVerify ? LucideIcons.badgeCheck : LucideIcons.lock,
-            expand: true,
-            onPressed: canVerify ? () => setVerification(VerificationStatus.verified) : null,
+        if (!canVerify)
+          Padding(
+            padding: const EdgeInsets.only(bottom: EvSpace.x2),
+            child: Text('Accept a document to verify.', style: EvType.caption, textAlign: TextAlign.center),
           ),
-        if (!verified) const SizedBox(height: 8),
         Row(children: [
-          if (d.verification != VerificationStatus.rejected) ...[
-            Expanded(
-              child: _OutlineAction(
-                label: verified ? 'Revoke verification' : 'Reject verification',
-                icon: LucideIcons.circleX,
-                color: EvColors.danger,
-                onTap: () => setVerification(VerificationStatus.rejected),
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
           Expanded(
-            child: _OutlineAction(
-              label: suspended ? 'Reactivate account' : 'Suspend account',
-              icon: suspended ? LucideIcons.rotateCcw : LucideIcons.ban,
-              color: suspended ? EvColors.forest : EvColors.warning,
-              onTap: setStatus,
-            ),
+            child: EvButton('Send back', kind: EvButtonKind.secondary, expand: true,
+                onPressed: () => _setVerification(context, ref, d, VerificationStatus.rejected, onChanged)),
+          ),
+          const SizedBox(width: EvSpace.x2),
+          Expanded(
+            child: EvButton('Verify', icon: LucideIcons.badgeCheck, expand: true,
+                onPressed: canVerify ? () => _setVerification(context, ref, d, VerificationStatus.verified, onChanged) : null),
           ),
         ]),
       ]),
@@ -427,47 +526,19 @@ class _DecisionBar extends ConsumerWidget {
   }
 }
 
-/// Secondary decision: outlined, coloured by consequence, full label.
-class _OutlineAction extends StatelessWidget {
-  const _OutlineAction({required this.label, required this.icon, required this.color, required this.onTap});
-  final String label;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: EvRadius.mdAll,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 46),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            decoration: BoxDecoration(borderRadius: EvRadius.mdAll, border: Border.all(color: color.withValues(alpha: 0.45), width: 1.4)),
-            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 6),
-              Flexible(child: Text(label, style: EvType.smallStrong.copyWith(color: color), textAlign: TextAlign.center, maxLines: 2)),
-            ]),
-          ),
-        ),
-      );
-}
-
 class _Fact extends StatelessWidget {
-  const _Fact(this.icon, this.label, this.value, {this.action, this.badge});
+  const _Fact(this.icon, this.label, this.value, {this.action, this.note});
   final IconData icon;
   final String label;
   final String value;
   final VoidCallback? action;
-  final Widget? badge;
+  final (String, Color)? note;
 
   @override
   Widget build(BuildContext context) => InkWell(
         onTap: action,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: EvSpace.x4, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: EvSpace.x4, vertical: 10),
           child: Row(children: [
             Icon(icon, size: 18, color: EvColors.ink3),
             const SizedBox(width: 12),
@@ -475,31 +546,10 @@ class _Fact extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(label, style: EvType.caption),
                 Text(value, style: EvType.body),
-                if (badge != null) Padding(padding: const EdgeInsets.only(top: 4), child: badge),
+                if (note != null) Text(note!.$1, style: EvType.caption.copyWith(color: note!.$2, fontWeight: FontWeight.w600)),
               ]),
             ),
             if (action != null) const Icon(LucideIcons.externalLink, size: 16, color: EvColors.forest),
-          ]),
-        ),
-      );
-}
-
-class _Count extends StatelessWidget {
-  const _Count(this.label, this.value, {this.sub, this.alert = false});
-  final String label;
-  final String value;
-  final String? sub;
-  final bool alert;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-        width: (MediaQuery.sizeOf(context).width - 2 * EvSpace.gutter - 8) / 2,
-        child: EvSurface(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: EvType.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text(value, style: EvType.number.copyWith(color: alert ? EvColors.danger : EvColors.ink)),
-            // Always reserve the sub line so every card in the grid is the same height.
-            Text(sub ?? ' ', style: EvType.caption),
           ]),
         ),
       );

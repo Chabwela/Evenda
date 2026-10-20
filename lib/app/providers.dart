@@ -94,6 +94,16 @@ class OnboardingCelebration extends Notifier<bool> {
 
 final onboardingCelebrationProvider = NotifierProvider<OnboardingCelebration, bool>(OnboardingCelebration.new);
 
+/// True once the launch screen's mark has finished its intro; the router
+/// stays on /launch until then so the animation is never cut off.
+class LaunchIntroDone extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void set(bool v) => state = v;
+}
+
+final launchIntroDoneProvider = NotifierProvider<LaunchIntroDone, bool>(LaunchIntroDone.new);
+
 final unreadCountProvider = FutureProvider<int>((ref) async {
   ref.watchDomains(const [DataDomain.notifications]);
   final biz = ref.watch(myBusinessProvider).value;

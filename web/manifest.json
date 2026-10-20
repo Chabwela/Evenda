@@ -3,7 +3,7 @@
     "short_name": "evenda",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#1B3B22",
+    "background_color": "#FBF8F1",
     "theme_color": "#1B3B22",
     "description": "A new Flutter project.",
     "orientation": "portrait-primary",

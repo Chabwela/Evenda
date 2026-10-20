@@ -30,12 +30,27 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen> {
   Timer? _timer;
   bool _slow = false;
 
+  Timer? _introTimer;
+
   @override
   void initState() {
     super.initState();
     _timer = Timer(_patience, () {
       if (mounted) setState(() => _slow = true);
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Let the mark finish carving before the router moves on (skipped with
+    // reduced motion). Only ever once per app start.
+    if (_introTimer == null && !ref.read(launchIntroDoneProvider)) {
+      _introTimer = Timer(EvMotion.reduced(context) ? Duration.zero : EvendaMark.introDuration + const Duration(milliseconds: 150), () {
+        ref.read(launchIntroDoneProvider.notifier).set(true);
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   // Stay on the offline state while retrying (no flash back to the spinner);
@@ -45,6 +60,7 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _introTimer?.cancel();
     super.dispose();
   }
 
@@ -72,7 +88,13 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen> {
           if (biz.hasError)
             ErrorState(error: biz.error!, compact: true, onRetry: _retry)
           else
-            const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+            // Spinner only once the mark has finished and we're still waiting;
+            // reserve its space so the mark never shifts.
+            SizedBox(
+              height: 20,
+              width: 20,
+              child: ref.watch(launchIntroDoneProvider) ? const CircularProgressIndicator(strokeWidth: 2) : null,
+            ),
         ]),
       ),
     );
@@ -84,12 +106,15 @@ class WelcomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final wide = MediaQuery.sizeOf(context).width >= EvBreakpoints.tablet;
+    final size = MediaQuery.sizeOf(context);
+    final wide = size.width >= EvBreakpoints.tablet;
+    // Shorter on 360x800-class phones so the story fits above the pinned buttons.
+    final heroHeight = (size.height * 0.32).clamp(220.0, 300.0);
 
     final content = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const EvArrive(child: Align(alignment: Alignment.centerLeft, child: EvendaLogo(size: 30))),
       const SizedBox(height: EvSpace.x5),
-      const EvArrive(delay: Duration(milliseconds: 120), child: WelcomeHero(height: 300)),
+      EvArrive(delay: const Duration(milliseconds: 120), child: WelcomeHero(height: heroHeight)),
       const SizedBox(height: EvSpace.x6),
       const EvArrive(delay: Duration(milliseconds: 260), child: RotatingPromise()),
       const SizedBox(height: EvSpace.x2),
@@ -100,7 +125,10 @@ class WelcomeScreen extends ConsumerWidget {
           style: EvType.body.copyWith(color: EvColors.ink2),
         ),
       ),
-      const SizedBox(height: EvSpace.x6),
+    ]);
+
+    // Both ways in stay on screen on every phone height; the story scrolls above them.
+    final actions = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       EvArrive(
         delay: const Duration(milliseconds: 420),
         child: EvButton('Create a vendor account', icon: LucideIcons.userPlus, expand: true, onPressed: () => context.push('/auth/signup')),
@@ -110,8 +138,6 @@ class WelcomeScreen extends ConsumerWidget {
         delay: const Duration(milliseconds: 480),
         child: EvButton('I already have an account', kind: EvButtonKind.secondary, icon: LucideIcons.mail, expand: true, onPressed: () => context.push('/auth/email')),
       ),
-      const SizedBox(height: EvSpace.x6),
-      Align(alignment: Alignment.center, child: Text('Made in Lusaka · DanTech Solutions Group', style: EvType.caption)),
     ]);
 
     return Scaffold(
@@ -119,7 +145,10 @@ class WelcomeScreen extends ConsumerWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: wide ? 520 : double.infinity),
-            child: ListView(padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x5, EvSpace.gutter, EvSpace.x6), children: [content]),
+            child: Column(children: [
+              Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x5, EvSpace.gutter, EvSpace.x4), children: [content])),
+              Padding(padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, EvSpace.x4), child: actions),
+            ]),
           ),
         ),
       ),
@@ -138,10 +167,10 @@ String? _validateNewPassword(String? v) {
   return null;
 }
 
-/// Shared frame for the email auth screens: logo, heading and a raised card.
+/// Shared frame for the email auth screens: logo, heading, one line of
+/// context, then the form straight on the page (no card), like the rest of the app.
 class _AuthFrame extends StatelessWidget {
-  const _AuthFrame({required this.overline, required this.title, this.intro, required this.child, this.footer});
-  final String overline;
+  const _AuthFrame({required this.title, this.intro, required this.child, this.footer});
   final String title;
   final String? intro;
   final Widget child;
@@ -166,35 +195,21 @@ class _AuthFrame extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 8, EvSpace.gutter, EvSpace.x8),
               children: [
-                const EvArrive(child: Align(alignment: Alignment.centerLeft, child: EvendaLogo(size: 26))),
-                const SizedBox(height: EvSpace.x5),
+                const EvArrive(child: Align(alignment: Alignment.centerLeft, child: EvendaLogo(size: 24))),
+                const SizedBox(height: EvSpace.x8),
                 EvArrive(
                   delay: const Duration(milliseconds: 80),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(overline, style: EvType.overline.copyWith(color: EvColors.forest)),
-                    const SizedBox(height: 6),
                     Text(title, style: EvType.display),
                     if (intro != null) ...[
                       const SizedBox(height: EvSpace.x2),
-                      Text(intro!, style: EvType.small.copyWith(color: EvColors.ink2)),
+                      Text(intro!, style: EvType.body.copyWith(color: EvColors.ink2)),
                     ],
                   ]),
                 ),
-                const SizedBox(height: EvSpace.x5),
-                EvArrive(
-                  delay: const Duration(milliseconds: 140),
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(EvSpace.x4, EvSpace.x4, EvSpace.x4, EvSpace.x5),
-                    decoration: BoxDecoration(
-                      color: EvColors.warmWhite,
-                      borderRadius: EvRadius.lgAll,
-                      border: Border.all(color: EvColors.hairline, width: 1.2),
-                      boxShadow: EvShadow.raised,
-                    ),
-                    child: child,
-                  ),
-                ),
-                if (footer != null) ...[const SizedBox(height: EvSpace.x4), footer!],
+                const SizedBox(height: EvSpace.x6),
+                EvArrive(delay: const Duration(milliseconds: 140), child: child),
+                if (footer != null) ...[const SizedBox(height: EvSpace.x6), footer!],
               ],
             ),
           ),
@@ -231,7 +246,6 @@ class _PasswordFieldState extends State<_PasswordField> {
           style: EvType.body,
           decoration: InputDecoration(
             helperText: widget.isNew ? 'At least 8 characters, with letters and numbers' : null,
-            prefixIcon: const Icon(LucideIcons.keyRound, size: 18, color: EvColors.ink3),
             suffixIcon: IconButton(
               tooltip: _obscure ? 'Show password' : 'Hide password',
               icon: Icon(_obscure ? LucideIcons.eye : LucideIcons.eyeOff, size: 18),
@@ -255,7 +269,8 @@ class _EmailField extends StatelessWidget {
         keyboardType: TextInputType.emailAddress,
         textCapitalization: TextCapitalization.none,
         textInputAction: TextInputAction.next,
-        prefixIcon: LucideIcons.mail,
+        autofillHints: const [AutofillHints.email, AutofillHints.username],
+        autocorrect: false,
         validator: _validateEmail,
       );
 }
@@ -305,8 +320,8 @@ class _EmailPasswordScreenState extends ConsumerState<EmailPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return _AuthFrame(
-      overline: 'Vendor sign in',
       title: 'Welcome back',
+      intro: 'Sign in to your business on Evenda.',
       footer: Center(
         child: TextButton(onPressed: () => context.pushReplacement('/auth/signup'), child: const Text('New to Evenda? Create an account')),
       ),
@@ -369,7 +384,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     return _AuthFrame(
-      overline: 'New vendor',
       title: 'Create your account',
       intro: 'You’ll set up your business profile next. We’ll email you a code to confirm your address.',
       footer: Center(
@@ -386,7 +400,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               autofocus: true,
               textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.next,
-              prefixIcon: LucideIcons.user,
+              autofillHints: const [AutofillHints.name],
               validator: (v) => (v == null || v.trim().length < 2) ? 'Enter your name' : null,
             ),
             const SizedBox(height: EvSpace.x4),
@@ -452,7 +466,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return _AuthFrame(
-      overline: 'Password reset',
       title: 'Forgot your password?',
       intro: 'Enter your account email and we’ll send you a 6-digit code to set a new one.',
       child: Form(
@@ -525,7 +538,6 @@ class _EmailCodeScreenState extends ConsumerState<EmailCodeScreen> {
   @override
   Widget build(BuildContext context) {
     return _AuthFrame(
-      overline: widget.recovery ? 'Password reset' : 'Confirm your email',
       title: 'Enter the code',
       intro: 'We sent a 6-digit code to ${widget.email}. It can take a minute to arrive — check spam too.',
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -576,7 +588,6 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return _AuthFrame(
-      overline: 'Password reset',
       title: 'Choose a new password',
       child: AutofillGroup(
         child: Form(

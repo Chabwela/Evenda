@@ -24,7 +24,8 @@ class DemoDb {
   // Businesses
   final businesses = <String, Business>{};
   final team = <String, List<TeamMember>>{};
-  final verificationDocs = <String, int>{};
+  final verificationDocs = <String, List<VerificationDocument>>{};
+  final verificationNotes = <String, String>{};
 
   // Inventory
   final listings = <String, Listing>{};
