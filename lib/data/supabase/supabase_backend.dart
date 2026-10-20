@@ -311,6 +311,40 @@ class _SbAuth implements AuthApi {
 
   @override
   Future<void> signOut() => b.call(b._signOut);
+
+  @override
+  Future<({bool isAdmin, int teamMembers, int activeBookings})> deletionCheck() async {
+    final m = (await b.rpc('account_deletion_check') as Map).cast<String, dynamic>();
+    return (isAdmin: m['is_admin'] == true, teamMembers: (m['team_members'] as num).toInt(), activeBookings: (m['active_bookings'] as num).toInt());
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    final uid = b.client.auth.currentUser?.id;
+    if (uid == null) throw const EvError('not_authenticated');
+    final check = await deletionCheck();
+    if (check.isAdmin) throw const EvError('admin_cannot_self_delete');
+    if (check.teamMembers > 0) throw const EvError('owner_has_team');
+    if (check.activeBookings > 0) throw const EvError('has_active_bookings');
+
+    // Files first (the database cannot remove them): logo, listing photos and
+    // verification documents live under <business_id>/ in each bucket.
+    final owned = await b.call(() => b.client.from('businesses').select('id').eq('owner_id', uid).maybeSingle());
+    final biz = owned?['id'] as String?;
+    if (biz != null) {
+      for (final bucket in ['business-logos', 'listing-photos', 'verification']) {
+        final files = await b.call(() => b.client.storage.from(bucket).list(path: biz, searchOptions: const sb.SearchOptions(limit: 1000)));
+        final paths = [for (final f in files) if (f.id != null) '$biz/${f.name}'];
+        if (paths.isNotEmpty) await b.call(() => b.client.storage.from(bucket).remove(paths));
+      }
+    }
+    await b.rpc('delete_my_account');
+    b._deviceToken = null;
+    // The login no longer exists; clear the local session only.
+    try {
+      await b.client.auth.signOut(scope: sb.SignOutScope.local);
+    } catch (_) {}
+  }
 }
 
 // ============================================================================

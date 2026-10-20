@@ -186,6 +186,12 @@ class _DemoAuth implements AuthApi {
   }
 
   @override
+  Future<({bool isAdmin, int teamMembers, int activeBookings})> deletionCheck() async => (isAdmin: false, teamMembers: 0, activeBookings: 0);
+
+  @override
+  Future<void> deleteAccount() async => throw _noAccounts;
+
+  @override
   Future<void> signOut() async {
     b.db.sessionUserId = null;
     b._sessions.add(null);

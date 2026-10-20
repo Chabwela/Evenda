@@ -14,6 +14,7 @@ import '../features/bookings/quotation_composer.dart';
 import '../features/bookings/request_detail.dart';
 import '../features/business/availability_screen.dart';
 import '../features/business/business_screen.dart';
+import '../features/business/delete_account_screen.dart';
 import '../features/business/inventory_screen.dart';
 import '../features/business/listing_editor.dart';
 import '../features/business/listings_screen.dart';
@@ -130,6 +131,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       _r('/work/event/:id', (s) => EventDetailScreen(id: s.pathParameters['id']!)),
       _r('/work/event/:id/edit', (s) => EventEditorScreen(id: s.pathParameters['id'])),
       _r('/work/task/:id', (s) => TaskDetailScreen(id: s.pathParameters['id']!)),
+      _r('/business/delete-account', (_) => const DeleteAccountScreen()),
       _r('/business/profile', (_) => const BusinessProfileScreen()),
       _r('/business/listings', (_) => const ListingsScreen()),
       _r('/business/listings/new', (s) => ListingEditorScreen(kind: s.uri.queryParameters['kind'])),

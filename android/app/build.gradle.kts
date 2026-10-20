@@ -1,7 +1,19 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Upload key for Google Play, kept outside git in android/key.properties:
+//   storeFile=/absolute/path/to/evenda-upload.jks
+//   storePassword=...
+//   keyAlias=evenda-upload
+//   keyPassword=...
+val keyProps = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
 }
 
 android {
@@ -25,11 +37,23 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (keyProps.getProperty("storeFile") != null) {
+            create("upload") {
+                storeFile = file(keyProps.getProperty("storeFile"))
+                storePassword = keyProps.getProperty("storePassword")
+                keyAlias = keyProps.getProperty("keyAlias")
+                keyPassword = keyProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Google Play rejects debug-signed bundles, so a release build
+            // without android/key.properties fails instead of silently using
+            // the debug key.
+            signingConfig = signingConfigs.findByName("upload")
         }
     }
 }
@@ -49,4 +73,12 @@ flutter {
 // notifications still work), so a missing file never breaks the build.
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
+}
+
+// Fail release builds (only) when the upload key is missing, so a
+// debug-signed bundle can never be produced by accident.
+gradle.taskGraph.whenReady {
+    if (allTasks.any { it.name.contains("Release") } && keyProps.getProperty("storeFile") == null) {
+        throw GradleException("Release signing: create android/key.properties (see the comment at the top of android/app/build.gradle.kts).")
+    }
 }

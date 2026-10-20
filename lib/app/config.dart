@@ -28,5 +28,11 @@ abstract final class AppConfig {
   static bool get hasBackend => supabaseUrl.isNotEmpty && supabaseKey.isNotEmpty;
   static bool get usingDevTiles => mapTileUrl.contains('tile.openstreetmap.org');
 
+  /// Public privacy policy and account-deletion pages (required by Google
+  /// Play). Set them once the pages are hosted; links stay hidden while empty.
+  static const privacyPolicyUrl = String.fromEnvironment('PRIVACY_POLICY_URL');
+  static const accountDeletionUrl = String.fromEnvironment('ACCOUNT_DELETION_URL');
+  static const supportEmail = String.fromEnvironment('SUPPORT_EMAIL');
+
   static const userAgentPackage = 'com.dantechsolutionsgroup.evenda';
 }

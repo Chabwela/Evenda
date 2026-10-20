@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/providers.dart';
+import '../../app/config.dart';
 import '../../app/shell.dart';
 import '../../core/format.dart';
 import '../../data/backend.dart';
@@ -133,6 +135,15 @@ class BusinessScreen extends ConsumerWidget {
                 await ref.read(backendProvider).auth.signOut();
               }
             }),
+            if (AppConfig.privacyPolicyUrl.isNotEmpty)
+              TextButton(
+                onPressed: () => launchUrl(Uri.parse(AppConfig.privacyPolicyUrl), mode: LaunchMode.externalApplication),
+                child: Text('Privacy policy', style: EvType.caption.copyWith(decoration: TextDecoration.underline)),
+              ),
+            TextButton(
+              onPressed: () => context.push('/business/delete-account'),
+              child: Text('Delete account', style: EvType.caption.copyWith(color: EvColors.danger)),
+            ),
             const SizedBox(height: EvSpace.x4),
             const EvendaLogo(size: 18),
             const SizedBox(height: 4),

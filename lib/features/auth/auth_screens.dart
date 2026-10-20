@@ -5,8 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/providers.dart';
+import '../../app/config.dart';
 import '../../core/format.dart';
 import '../../core/connectivity.dart';
 import '../../core/errors.dart';
@@ -400,6 +402,22 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             _PasswordField(controller: _password, isNew: true, onSubmitted: _create),
             const SizedBox(height: EvSpace.x5),
             EvButton('Create account', expand: true, loading: _busy, onPressed: _create),
+            if (AppConfig.privacyPolicyUrl.isNotEmpty) ...[
+              const SizedBox(height: EvSpace.x3),
+              Center(
+                child: InkWell(
+                  onTap: () => launchUrl(Uri.parse(AppConfig.privacyPolicyUrl), mode: LaunchMode.externalApplication),
+                  child: Text.rich(
+                    TextSpan(style: EvType.caption, children: [
+                      const TextSpan(text: 'By creating an account you agree to how Evenda handles your data, described in our '),
+                      TextSpan(text: 'privacy policy', style: EvType.caption.copyWith(color: EvColors.forest, decoration: TextDecoration.underline)),
+                      const TextSpan(text: '.'),
+                    ]),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
           ]),
         ),
       ),

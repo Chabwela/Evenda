@@ -67,6 +67,13 @@ abstract class AuthApi {
   Future<void> sendOtp(String e164Phone);
   Future<void> verifyOtp(String e164Phone, String code);
   Future<void> updateProfileName(String name);
+  /// What would stop this account being deleted (admin, team, active bookings).
+  Future<({bool isAdmin, int teamMembers, int activeBookings})> deletionCheck();
+
+  /// Permanently delete the signed-in account: files, private data, login.
+  /// An owned business is anonymised (see migration 20261020000300).
+  Future<void> deleteAccount();
+
   Future<void> signOut();
 }
 
