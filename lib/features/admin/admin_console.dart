@@ -175,47 +175,136 @@ class _Overview extends ConsumerWidget {
       value: stats,
       onRetry: () => ref.invalidate(_statsProvider),
       data: (m) {
-        // Two columns on a phone, more on wider screens (a fixed 180 px left
-        // half of a phone screen empty). Measured, so the tablet rail counts.
-        return LayoutBuilder(builder: (context, box) {
-        final avail = box.maxWidth - 2 * EvSpace.gutter;
-        final cols = ((avail + 10) / 190).floor().clamp(2, 6);
-        final tileWidth = (avail - 10 * (cols - 1)) / cols;
-        Widget tile(String label, int v, {Tone tone = Tone.neutral, _Section? open}) => SizedBox(
-              width: tileWidth,
-              child: EvSurface(
-                onTap: open != null && role.can(open.permission) ? () => onOpen(open) : null,
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(label, style: EvType.caption, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 6),
-                  EvAnimatedCount(value: v, style: EvType.number.copyWith(color: tone == Tone.neutral ? EvColors.ink : tone.fg)),
-                ]),
+        int n(String k) => m[k] ?? 0;
+        final hour = EvDates.nowLusaka().hour;
+        final greeting = hour < 12 ? 'Good morning' : (hour < 17 ? 'Good afternoon' : 'Good evening');
+
+        // What needs a person, most serious first. Only sections this role can open.
+        final queue = <_QueueItem>[
+          _QueueItem(LucideIcons.gavel, 'Open disputes', 'Vendors waiting for a ruling', n('open_disputes'), Tone.critical, _Section.disputes),
+          _QueueItem(LucideIcons.badgeCheck, 'Verification requests', 'Documents to check before the badge', n('pending_verification'), Tone.waiting, _Section.businesses),
+          _QueueItem(LucideIcons.flag, 'Flagged listings', 'Listings reported or held for review', n('flagged_listings'), Tone.attention, _Section.listings),
+          _QueueItem(LucideIcons.zap, 'Live Evenda Now', 'Urgent requests open right now', n('now_open'), Tone.progress, _Section.now),
+          _QueueItem(LucideIcons.bellOff, 'Failed pushes (24 h)', 'Notifications that did not reach a phone', n('push_failed_24h'), Tone.attention, null),
+        ].where((q) => q.section == null || role.can(q.section!.permission)).toList();
+        final waiting = queue.where((q) => q.count > 0).length;
+
+        return ListView(padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, EvSpace.x10), children: [
+          // Header: the platform at a glance.
+          Container(
+            padding: const EdgeInsets.all(EvSpace.x4),
+            decoration: BoxDecoration(color: EvColors.forest, borderRadius: EvRadius.lgAll),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const EvendaMark(size: 22, onDark: true),
+                const SizedBox(width: 8),
+                Expanded(child: Text(EvDates.dayLong(EvDates.today()).toUpperCase(), style: EvType.overline.copyWith(color: EvColors.sand))),
+              ]),
+              const SizedBox(height: EvSpace.x3),
+              Text(greeting, style: EvType.display.copyWith(color: EvColors.inkOnDark)),
+              const SizedBox(height: 2),
+              Text(
+                '${waiting == 0 ? 'Nothing is waiting on you' : '$waiting thing${waiting == 1 ? '' : 's'} need${waiting == 1 ? 's' : ''} your decision'}'
+                ' · ${plural(n('open_quote_requests'), 'open quote request')}',
+                style: EvType.small.copyWith(color: waiting == 0 ? EvColors.sand : const Color(0xFFC9A27A)),
               ),
-            );
-        return ListView(padding: const EdgeInsets.all(EvSpace.gutter), children: [
-          Text('NEEDS ATTENTION', style: EvType.overline),
-          const SizedBox(height: EvSpace.x2),
-          Wrap(spacing: 10, runSpacing: 10, children: [
-            tile('Verification requests', m['pending_verification'] ?? 0, tone: (m['pending_verification'] ?? 0) > 0 ? Tone.waiting : Tone.neutral, open: _Section.businesses),
-            tile('Flagged listings', m['flagged_listings'] ?? 0, tone: (m['flagged_listings'] ?? 0) > 0 ? Tone.attention : Tone.neutral, open: _Section.listings),
-            tile('Open disputes', m['open_disputes'] ?? 0, tone: (m['open_disputes'] ?? 0) > 0 ? Tone.critical : Tone.neutral, open: _Section.disputes),
-            tile('Failed pushes (24 h)', m['push_failed_24h'] ?? 0, tone: (m['push_failed_24h'] ?? 0) > 0 ? Tone.attention : Tone.neutral),
-          ]),
-          const SizedBox(height: EvSpace.x6),
-          Text('PLATFORM', style: EvType.overline),
-          const SizedBox(height: EvSpace.x2),
-          Wrap(spacing: 10, runSpacing: 10, children: [
-            tile('Active businesses', m['businesses'] ?? 0, open: _Section.businesses),
-            tile('Published listings', m['published_listings'] ?? 0, open: _Section.listings),
-            tile('Open quote requests', m['open_quote_requests'] ?? 0),
-            tile('Bookings (30 days)', m['bookings_30d'] ?? 0, open: _Section.bookings),
-            tile('Live Evenda Now', m['now_open'] ?? 0, tone: Tone.progress, open: _Section.now),
-          ]),
+              const SizedBox(height: EvSpace.x4),
+              Row(children: [
+                Expanded(child: _HeaderStat('Businesses', n('businesses'), onTap: role.can(_Section.businesses.permission) ? () => onOpen(_Section.businesses) : null)),
+                Expanded(child: _HeaderStat('Listings', n('published_listings'), onTap: role.can(_Section.listings.permission) ? () => onOpen(_Section.listings) : null)),
+                Expanded(child: _HeaderStat('Bookings · 30 d', n('bookings_30d'), onTap: role.can(_Section.bookings.permission) ? () => onOpen(_Section.bookings) : null)),
+              ]),
+            ]),
+          ),
+
+          const SectionHeader('Needs your decision', padding: EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
+          EvSurface(
+            padding: EdgeInsets.zero,
+            child: Column(children: [
+              for (final (i, q) in queue.indexed) ...[
+                if (i > 0) const EvDivider(indent: 64),
+                _QueueRow(item: q, onTap: q.section == null ? null : () => onOpen(q.section!)),
+              ],
+            ]),
+          ),
+
         ]);
-        });
       },
     );
   }
+}
+
+class _QueueItem {
+  const _QueueItem(this.icon, this.title, this.hint, this.count, this.tone, this.section);
+  final IconData icon;
+  final String title;
+  final String hint;
+  final int count;
+  final Tone tone;
+  final _Section? section;
+}
+
+class _QueueRow extends StatelessWidget {
+  const _QueueRow({required this.item, this.onTap});
+  final _QueueItem item;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final q = item;
+    final active = q.count > 0;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: EvSpace.x4, vertical: 12),
+        child: Row(children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(color: active ? q.tone.bg : EvColors.neutralTint, borderRadius: EvRadius.smAll),
+            child: Icon(q.icon, size: 18, color: active ? q.tone.fg : EvColors.ink3),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(q.title, style: active ? EvType.bodyStrong : EvType.body.copyWith(color: EvColors.ink2)),
+              Text(active ? q.hint : 'All clear', style: EvType.caption),
+            ]),
+          ),
+          if (active)
+            Container(
+              constraints: const BoxConstraints(minWidth: 28),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(color: q.tone.fg, borderRadius: BorderRadius.circular(EvRadius.pill)),
+              child: Text('${q.count}', textAlign: TextAlign.center, style: EvType.smallStrong.copyWith(color: EvColors.inkOnDark)),
+            )
+          else
+            const Icon(LucideIcons.circleCheck, size: 18, color: EvColors.success),
+          if (onTap != null) ...[const SizedBox(width: 6), const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3)],
+        ]),
+      ),
+    );
+  }
+}
+
+class _HeaderStat extends StatelessWidget {
+  const _HeaderStat(this.label, this.value, {this.onTap});
+  final String label;
+  final int value;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        borderRadius: EvRadius.smAll,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            EvAnimatedCount(value: value, style: EvType.number.copyWith(color: EvColors.inkOnDark)),
+            Text(label, style: EvType.caption.copyWith(color: EvColors.sand), maxLines: 1, overflow: TextOverflow.ellipsis),
+          ]),
+        ),
+      );
 }
 
 class _Businesses extends ConsumerStatefulWidget {
