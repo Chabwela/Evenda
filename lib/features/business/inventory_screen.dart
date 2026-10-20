@@ -474,35 +474,6 @@ class _StockCard extends ConsumerWidget {
                 ],
               ),
             ),
-          // Everyday stock changes, one tap away (damage and repairs: ⋮ menu).
-          Padding(
-            padding: const EdgeInsets.fromLTRB(EvSpace.x4, EvSpace.x3, EvSpace.x4, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: EvButton(
-                    'Add',
-                    compact: true,
-                    kind: EvButtonKind.secondary,
-                    icon: LucideIcons.plus,
-                    expand: true,
-                    onPressed: () => _adjust(context, ref, true),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: EvButton(
-                    'Remove',
-                    compact: true,
-                    kind: EvButtonKind.secondary,
-                    icon: LucideIcons.minus,
-                    expand: true,
-                    onPressed: l.usable == 0 ? null : () => _adjust(context, ref, false),
-                  ),
-                ),
-              ],
-            ),
-          ),
           if (upcoming.isNotEmpty) ...[
             const Padding(
               padding: EdgeInsets.only(top: EvSpace.x3),
