@@ -1270,6 +1270,42 @@ class _SbAdmin implements AdminApi {
   }
 
   @override
+  Future<AdminNowDetail> nowDetail(String requestId) async {
+    final recips = await b.call(() => b.client
+        .from('now_request_recipients')
+        .select('*, businesses(id, name, logo_path, neighbourhood, verification_status, whatsapp, phone)')
+        .eq('request_id', requestId)
+        .order('distance_km', ascending: true));
+    final offers = await b.call(() => b.client.from('now_offers').select(NowOffer.columns).eq('request_id', requestId).order('created_at', ascending: true));
+    final hist = await b.call(() => b.client.from('now_status_history').select().eq('request_id', requestId).order('created_at', ascending: true));
+    DateTime? dt(Object? v) => v == null ? null : DateTime.parse(v as String).toLocal();
+    return AdminNowDetail(
+      recipients: [
+        for (final r in recips)
+          AdminNowRecipient(
+            business: BizRef.fromRow(r['businesses']),
+            distanceKm: (r['distance_km'] as num).toDouble(),
+            available: (r['available_quantity'] as num).toInt(),
+            notifiedAt: dt(r['notified_at'])!,
+            seenAt: dt(r['seen_at']),
+            declinedAt: dt(r['declined_at']),
+          ),
+      ],
+      offers: [for (final r in offers) NowOffer.fromRow(r)],
+      history: [
+        for (final h in hist)
+          (from: h['from_status'] == null ? null : NowStatus.parse(h['from_status']), to: NowStatus.parse(h['to_status']), at: dt(h['created_at'])!, note: h['note'] as String?),
+      ],
+    );
+  }
+
+  @override
+  Future<void> closeNowRequest(String requestId, String reason) async {
+    await b.rpc('admin_close_now_request', {'p_request': requestId, 'p_reason': reason});
+    b.touch({DataDomain.admin, DataDomain.now});
+  }
+
+  @override
   Future<Map<String, int>> stats() async {
     final m = await b.rpc('admin_platform_stats') as Map<String, dynamic>;
     return m.map((k, v) => MapEntry(k, (v as num).toInt()));

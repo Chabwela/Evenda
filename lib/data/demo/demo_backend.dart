@@ -1752,6 +1752,12 @@ class _DemoAdmin implements AdminApi {
   Future<void> cancelBooking(String bookingId, String reason) async => throw const EvError('not_found', 'Needs the live backend.');
 
   @override
+  Future<AdminNowDetail> nowDetail(String requestId) async => const AdminNowDetail(recipients: [], offers: [], history: []);
+
+  @override
+  Future<void> closeNowRequest(String requestId, String reason) async => throw const EvError('not_found', 'Needs the live backend.');
+
+  @override
   Future<AdminSession?> restore() async => _session;
 
   @override

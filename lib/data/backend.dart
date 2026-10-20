@@ -234,6 +234,12 @@ abstract class AdminApi {
   Future<List<Listing>> listingsForReview({ModerationStatus? status});
   Future<void> moderateListing(String listingId, ModerationStatus status, String reason);
   Future<List<NowRequest>> nowRequests();
+
+  /// Recipients, offers and status history of one Evenda Now request.
+  Future<AdminNowDetail> nowDetail(String requestId);
+
+  /// Close a live request as Evenda (reason required, audited, people told).
+  Future<void> closeNowRequest(String requestId, String reason);
   Future<List<Booking>> recentBookings();
 
   /// Cancel a booking as Evenda (reason required, audited, both parties told).

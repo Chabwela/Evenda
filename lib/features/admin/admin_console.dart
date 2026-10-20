@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -10,6 +11,7 @@ import '../../data/backend.dart';
 import '../../design/ev.dart';
 import '../../domain/models.dart';
 import '../shared/feed_cards.dart';
+import '../shared/map_widgets.dart';
 
 enum _Section {
   overview('Overview', LucideIcons.layoutDashboard, 'activity.read'),
@@ -352,27 +354,440 @@ class _ListingsState extends ConsumerState<_Listings> {
   }
 }
 
-class _NowMonitor extends ConsumerWidget {
+enum _NowFilter {
+  live('Live'),
+  matched('Matched'),
+  noReach('No suppliers'),
+  closed('Closed'),
+  all('All');
+
+  const _NowFilter(this.label);
+  final String label;
+
+  bool matches(NowRequest r) => switch (this) {
+        live => r.status.live || r.status == NowStatus.draft && r.expiresAt.isAfter(DateTime.now()),
+        matched => r.status == NowStatus.bookingConfirmed || r.status == NowStatus.completed,
+        noReach => r.recipientsCount == 0 && !r.status.live,
+        closed => r.status == NowStatus.expired || r.status == NowStatus.cancelled,
+        all => true,
+      };
+}
+
+/// Evenda Now command view: what is urgent right now, whether the network
+/// is answering, and the power to shut a request down.
+class _NowMonitor extends ConsumerStatefulWidget {
   const _NowMonitor();
   @override
-  Widget build(BuildContext context, WidgetRef ref) => AsyncView(
+  ConsumerState<_NowMonitor> createState() => _NowMonitorState();
+}
+
+class _NowMonitorState extends ConsumerState<_NowMonitor> {
+  _NowFilter? _filter;
+
+  @override
+  Widget build(BuildContext context) => AsyncView(
         value: ref.watch(_nowProvider),
         onRetry: () => ref.invalidate(_nowProvider),
         isEmpty: (l) => l.isEmpty,
-        empty: const EmptyState(mascot: Mascot.pin, title: 'No Evenda Now requests yet', compact: true),
-        data: (list) => ListView.separated(
-          itemCount: list.length,
-          separatorBuilder: (_, _) => const EvDivider(indent: 68),
-          itemBuilder: (c, i) {
-            final r = list[i];
-            return EvRow(
-              leading: IconTile(categoryIcon(r.categoryId), tone: r.status.live ? Tone.progress : Tone.neutral),
-              title: '${r.quantity} × ${r.itemDescription}',
-              subtitle: '${r.requester.name} · ${EvDates.day(r.neededFrom)} · ${r.radiusKm} km · ${plural(r.recipientsCount, 'recipient')}',
-              trailing: StatusPill(r.status.label, tone: toneForNow(r.status), dense: true),
-            );
-          },
+        empty: const EmptyState(mascot: Mascot.pin, title: 'No Evenda Now requests yet', body: 'Urgent vendor-to-vendor requests appear here as they go out.', compact: true),
+        data: (all) {
+          final live = all.where(_NowFilter.live.matches).length;
+          final sent = all.where((r) => r.status != NowStatus.draft).toList();
+          final reached = sent.where((r) => r.recipientsCount > 0).length;
+          final matched = all.where(_NowFilter.matched.matches).length;
+          final alerted = sent.fold<int>(0, (s, r) => s + r.recipientsCount);
+          String pct(int n, int d) => d == 0 ? '—' : '${(100 * n / d).round()}%';
+          final filter = _filter ?? (live > 0 ? _NowFilter.live : _NowFilter.all);
+          final list = all.where(filter.matches).toList();
+
+          return ListView(padding: const EdgeInsets.only(bottom: EvSpace.x10), children: [
+            Container(
+              margin: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, 0),
+              padding: const EdgeInsets.all(EvSpace.x4),
+              decoration: BoxDecoration(color: EvColors.forest, borderRadius: EvRadius.lgAll),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  _LiveDot(active: live > 0),
+                  const SizedBox(width: 8),
+                  Text(live > 0 ? 'LIVE NOW' : 'NOTHING URGENT RIGHT NOW', style: EvType.overline.copyWith(color: live > 0 ? const Color(0xFFC9A27A) : EvColors.sand)),
+                ]),
+                const SizedBox(height: 6),
+                Text('$live open request${live == 1 ? '' : 's'}', style: EvType.display.copyWith(color: EvColors.inkOnDark)),
+                Text('${all.length} in the last 100 · ${plural(alerted, 'supplier alert')}', style: EvType.caption.copyWith(color: EvColors.sand)),
+                const SizedBox(height: EvSpace.x4),
+                Row(children: [
+                  Expanded(child: _MoneyFact('Reached a supplier', pct(reached, sent.length), EvColors.inkOnDark)),
+                  Expanded(child: _MoneyFact('Ended in a booking', pct(matched, sent.length), const Color(0xFFC9A27A))),
+                ]),
+                if (sent.isNotEmpty && reached < sent.length) ...[
+                  const SizedBox(height: EvSpace.x3),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: EvColors.forestSoft, borderRadius: EvRadius.mdAll),
+                    child: Row(children: [
+                      const Icon(LucideIcons.radar, size: 18, color: Color(0xFFC9A27A)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text('${sent.length - reached} request${sent.length - reached == 1 ? '' : 's'} found no supplier in range. Recruit vendors in those categories and areas.',
+                            style: EvType.small.copyWith(color: EvColors.inkOnDark)),
+                      ),
+                    ]),
+                  ),
+                ],
+              ]),
+            ),
+            const SizedBox(height: EvSpace.x3),
+            EvSegmented<_NowFilter>(
+              value: filter,
+              onChanged: (v) => setState(() => _filter = v),
+              segments: [for (final f in _NowFilter.values) (f, '${f.label} ${all.where(f.matches).length}')],
+            ),
+            const SizedBox(height: EvSpace.x2),
+            if (list.isEmpty)
+              const EmptyState(title: 'Nothing here', body: 'No requests match this filter.', compact: true)
+            else
+              for (final r in list)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, 8),
+                  child: _NowCard(request: r, onTap: () => _openNowFile(context, ref, r)),
+                ),
+          ]);
+        },
+      );
+}
+
+class _LiveDot extends StatefulWidget {
+  const _LiveDot({required this.active});
+  final bool active;
+  @override
+  State<_LiveDot> createState() => _LiveDotState();
+}
+
+class _LiveDotState extends State<_LiveDot> with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (widget.active && !EvMotion.reduced(context)) {
+      _c.repeat(reverse: true);
+    } else {
+      _c.value = 1;
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: Tween(begin: 0.35, end: 1.0).animate(_c),
+        child: Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: widget.active ? const Color(0xFFC9A27A) : EvColors.sand, shape: BoxShape.circle),
         ),
+      );
+}
+
+class _NowCard extends StatelessWidget {
+  const _NowCard({required this.request, required this.onTap});
+  final NowRequest request;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = request;
+    final left = r.expiresAt.difference(DateTime.now());
+    final noReach = r.recipientsCount == 0 && r.status != NowStatus.draft;
+    return EvSurface(
+      onTap: onTap,
+      padding: EdgeInsets.zero,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: EvRadius.lgAll,
+          border: r.status.live ? const Border(left: BorderSide(color: EvColors.bronze, width: 4)) : null,
+        ),
+        padding: const EdgeInsets.all(EvSpace.x3),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(color: r.status.live ? EvColors.bronzeTint : EvColors.neutralTint, borderRadius: EvRadius.mdAll),
+              child: Icon(categoryIcon(r.categoryId), color: r.status.live ? EvColors.bronzeDeep : EvColors.ink2),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('${r.quantity} × ${r.itemDescription}', style: EvType.bodyStrong, maxLines: 2, overflow: TextOverflow.ellipsis),
+                Text(r.requester.name, style: EvType.small, maxLines: 1, overflow: TextOverflow.ellipsis),
+              ]),
+            ),
+            const SizedBox(width: 8),
+            StatusPill(r.status.label, tone: toneForNow(r.status), dense: true),
+          ]),
+          const SizedBox(height: EvSpace.x3),
+          Wrap(spacing: 14, runSpacing: 6, children: [
+            _Meta(LucideIcons.calendarClock, '${EvDates.day(r.neededFrom)}${r.neededByTime != null ? ' by ${r.neededByTime!.substring(0, 5)}' : ''}'),
+            _Meta(LucideIcons.mapPin, '${r.locationLabel} · ${r.radiusKm} km'),
+            _Meta(LucideIcons.bellRing, '${plural(r.recipientsCount, 'supplier')} alerted', color: noReach ? EvColors.danger : null),
+            if (r.maxBudget != null) _Meta(LucideIcons.wallet, 'Budget ${Money.k(r.maxBudget!)}'),
+            if (r.status.live && !left.isNegative)
+              _Meta(LucideIcons.timer, left.inHours > 0 ? '${left.inHours} h ${left.inMinutes % 60} min left' : '${left.inMinutes} min left', color: EvColors.bronzeDeep),
+          ]),
+        ]),
+      ),
+    );
+  }
+}
+
+class _Meta extends StatelessWidget {
+  const _Meta(this.icon, this.text, {this.color});
+  final IconData icon;
+  final String text;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 14, color: color ?? EvColors.ink3),
+        const SizedBox(width: 4),
+        Text(text, style: EvType.caption.copyWith(color: color, fontWeight: color != null ? FontWeight.w700 : null)),
+      ]);
+}
+
+void _openNowFile(BuildContext context, WidgetRef ref, NowRequest r) {
+  showEvSheet<void>(
+    context,
+    title: '${r.quantity} × ${r.itemDescription}',
+    subtitle: '${categoryById(r.categoryId).name} · ${r.broadcastAt != null ? 'sent ${EvDates.ago(r.broadcastAt!)}' : 'never sent to suppliers'}',
+    builder: (c) => _NowFile(request: r, onChanged: () => ref.invalidate(_nowProvider)),
+  );
+}
+
+final _nowDetailProvider = FutureProvider.autoDispose.family<AdminNowDetail, String>((ref, id) => ref.watch(backendProvider).admin.nowDetail(id));
+
+class _NowFile extends ConsumerWidget {
+  const _NowFile({required this.request, required this.onChanged});
+  final NowRequest request;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final r = request;
+    final role = ref.watch(adminSessionProvider).value?.role ?? ref.read(backendProvider).admin.current?.role;
+    final canClose = (role?.can('dispute.manage') ?? false) && (r.status.live || r.status == NowStatus.draft);
+    final detail = ref.watch(_nowDetailProvider(r.id));
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, EvSpace.x8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          StatusPill(r.status.label, tone: toneForNow(r.status)),
+          StatusPill(r.fulfilment.label, tone: Tone.neutral, icon: LucideIcons.truck),
+        ]),
+        const SizedBox(height: EvSpace.x3),
+        // Where it's needed, and how far the alert reached.
+        ClipRRect(
+          borderRadius: EvRadius.mdAll,
+          child: SizedBox(
+            height: 170,
+            child: FlutterMap(
+              options: MapOptions(
+                initialCenter: r.location,
+                initialZoom: r.radiusKm <= 5 ? 12 : r.radiusKm <= 15 ? 11 : r.radiusKm <= 40 ? 9.5 : 8,
+                interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+              ),
+              children: [
+                ...evTileLayers(),
+                CircleLayer(circles: [
+                  CircleMarker(
+                    point: r.location,
+                    radius: r.radiusKm * 1000.0,
+                    useRadiusInMeter: true,
+                    color: EvColors.bronze.withValues(alpha: 0.12),
+                    borderColor: EvColors.bronze,
+                    borderStrokeWidth: 1.5,
+                  ),
+                ]),
+                MarkerLayer(markers: [
+                  Marker(point: r.location, width: 36, height: 36, child: const Icon(LucideIcons.mapPin, size: 32, color: EvColors.forest, fill: 1)),
+                ]),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text('${r.locationLabel} · alert radius ${r.radiusKm} km', style: EvType.caption),
+
+        const SectionHeader('Requested by', padding: EdgeInsets.fromLTRB(0, EvSpace.x5, 0, EvSpace.x2)),
+        _AdminPartyTile(biz: r.requester, context: context, note: 'about the urgent request for ${r.quantity} × ${r.itemDescription}'),
+
+        const SectionHeader('Need', padding: EdgeInsets.fromLTRB(0, EvSpace.x5, 0, EvSpace.x2)),
+        EvSurface(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${r.quantity} × ${r.itemDescription}', style: EvType.bodyStrong),
+            const SizedBox(height: 4),
+            Text('${EvDates.range(r.neededFrom, r.neededTo)}${r.neededByTime != null ? ' · by ${r.neededByTime!.substring(0, 5)}' : ''}', style: EvType.small),
+            if (r.maxBudget != null) Text('Budget up to ${Money.zmw(r.maxBudget!)}', style: EvType.small),
+            Text('Expires ${EvDates.dayTime(r.expiresAt)}', style: EvType.caption),
+            if (r.notes.isNotEmpty) ...[const SizedBox(height: 6), Text('“${r.notes}”', style: EvType.small)],
+          ]),
+        ),
+
+        AsyncView<AdminNowDetail>(
+          value: detail,
+          onRetry: () => ref.invalidate(_nowDetailProvider(r.id)),
+          loading: const Padding(padding: EdgeInsets.all(EvSpace.x5), child: Center(child: CircularProgressIndicator())),
+          data: (d) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            SectionHeader('Suppliers alerted', count: d.recipients.length, padding: const EdgeInsets.fromLTRB(0, EvSpace.x5, 0, EvSpace.x2)),
+            if (d.recipients.isEmpty)
+              EvSurface(
+                color: EvColors.warningTint,
+                child: Text('No supplier matched: nobody in range had this category free on those dates.', style: EvType.small.copyWith(color: EvColors.warning)),
+              )
+            else
+              EvSurface(
+                padding: EdgeInsets.zero,
+                child: Column(children: [
+                  for (final (i, x) in d.recipients.indexed) ...[
+                    if (i > 0) const EvDivider(indent: 60),
+                    Builder(builder: (_) {
+                      final offered = d.offers.any((o) => o.supplier.id == x.business.id);
+                      final (label, tone) = offered
+                          ? ('Offered', Tone.positive)
+                          : x.declinedAt != null
+                              ? ('Declined', Tone.neutral)
+                              : x.seenAt != null
+                                  ? ('Seen', Tone.progress)
+                                  : ('Not opened', Tone.waiting);
+                      return EvRow(
+                        dense: true,
+                        leading: BusinessAvatar(name: x.business.name, logoUrl: x.business.logoUrl, size: 34, verified: x.business.verified),
+                        title: x.business.name,
+                        subtitle: '${x.distanceKm.toStringAsFixed(1)} km · ${x.available >= 999 ? 'has capacity' : '${x.available} free'}',
+                        trailing: StatusPill(label, tone: tone, dense: true),
+                      );
+                    }),
+                  ],
+                ]),
+              ),
+            SectionHeader('Offers', count: d.offers.length, padding: const EdgeInsets.fromLTRB(0, EvSpace.x5, 0, EvSpace.x2)),
+            if (d.offers.isEmpty)
+              Text('No offers.', style: EvType.small)
+            else
+              for (final o in d.offers)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: EvSurface(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(children: [
+                      BusinessAvatar(name: o.supplier.name, logoUrl: o.supplier.logoUrl, size: 34),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(o.supplier.name, style: EvType.smallStrong, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text('${o.quantity} × ${o.listingTitle} @ ${Money.k(o.unitPrice)}${o.canDeliver ? ' · delivers' : ''}', style: EvType.caption),
+                        ]),
+                      ),
+                      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                        Text(Money.k(o.total), style: EvType.money),
+                        StatusPill(o.status.label, tone: o.status == NowOfferStatus.selected ? Tone.positive : Tone.neutral, dense: true),
+                      ]),
+                    ]),
+                  ),
+                ),
+            SectionHeader('Timeline', count: d.history.length, padding: const EdgeInsets.fromLTRB(0, EvSpace.x5, 0, EvSpace.x2)),
+            for (final (i, h) in d.history.reversed.indexed)
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Column(children: [
+                  Container(width: 10, height: 10, margin: const EdgeInsets.only(top: 4), decoration: BoxDecoration(color: toneForNow(h.to).fg, shape: BoxShape.circle)),
+                  if (i < d.history.length - 1) Container(width: 2, height: 34, color: EvColors.sand),
+                ]),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(h.to.label, style: EvType.smallStrong),
+                      Text([EvDates.dayTime(h.at), if (h.note != null && h.note!.isNotEmpty) h.note!].join(' · '), style: EvType.caption),
+                    ]),
+                  ),
+                ),
+              ]),
+          ]),
+        ),
+
+        if (canClose) ...[
+          const SizedBox(height: EvSpace.x4),
+          EvSurface(
+            color: EvColors.dangerTint,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [
+                const Icon(LucideIcons.shieldAlert, size: 18, color: EvColors.danger),
+                const SizedBox(width: 8),
+                Text('Platform intervention', style: EvType.smallStrong.copyWith(color: EvColors.danger)),
+              ]),
+              const SizedBox(height: 6),
+              Text('Closing stops this request, expires pending offers, tells the requester why and tells alerted suppliers it is closed.', style: EvType.small),
+              const SizedBox(height: EvSpace.x3),
+              EvButton('Close request as Evenda', kind: EvButtonKind.danger, icon: LucideIcons.octagonX, expand: true, onPressed: () async {
+                final reason = await confirmWithReason(context,
+                    title: 'Close this request?', body: 'The requester sees this reason. It is stored in the audit log.', confirm: 'Close request', destructive: true);
+                if (reason == null || !context.mounted) return;
+                final ok = await guard(context, () async {
+                  await ref.read(backendProvider).admin.closeNowRequest(r.id, reason);
+                  return true;
+                }, success: 'Request closed and people notified');
+                if (ok == true && context.mounted) {
+                  onChanged();
+                  Navigator.pop(context);
+                }
+              }),
+            ]),
+          ),
+        ] else if (r.status == NowStatus.bookingConfirmed) ...[
+          const SizedBox(height: EvSpace.x4),
+          Text('This request ended in a booking. To intervene, cancel the booking in Bookings & payments.', style: EvType.caption),
+        ],
+      ]),
+    );
+  }
+}
+
+/// A business with call / WhatsApp / review shortcuts, for admin sheets.
+class _AdminPartyTile extends StatelessWidget {
+  const _AdminPartyTile({required this.biz, required this.context, required this.note});
+  final BizRef biz;
+  final BuildContext context;
+  final String note;
+
+  @override
+  Widget build(BuildContext _) => EvSurface(
+        padding: const EdgeInsets.all(12),
+        child: Row(children: [
+          BusinessAvatar(name: biz.name, logoUrl: biz.logoUrl, size: 40, verified: biz.verified),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(biz.name, style: EvType.bodyStrong, maxLines: 1, overflow: TextOverflow.ellipsis),
+              if (biz.neighbourhood != null) Text(biz.neighbourhood!, style: EvType.caption),
+            ]),
+          ),
+          if (biz.phone != null) EvIconButton(LucideIcons.phone, tooltip: 'Call', onPressed: () => launchUrl(Uri.parse('tel:${biz.phone}'))),
+          if (biz.whatsapp != null)
+            EvIconButton(LucideIcons.messageCircle,
+                tooltip: 'WhatsApp',
+                onPressed: () => launchUrl(Uri.parse('https://wa.me/${ZambianPhone.waDigits(biz.whatsapp!)}?text=${Uri.encodeComponent('Hello from the Evenda team $note.')}'),
+                    mode: LaunchMode.externalApplication)),
+          EvIconButton(LucideIcons.store, tooltip: 'Review business', onPressed: () {
+            Navigator.pop(context);
+            context.push('/admin/business/${biz.id}');
+          }),
+        ]),
       );
 }
 

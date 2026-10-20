@@ -1931,3 +1931,22 @@ class AdminDocument {
         _ => 'Other document',
       };
 }
+
+/// Admin view of one Evenda Now request: who was alerted, what they offered,
+/// and how the request moved.
+class AdminNowDetail {
+  const AdminNowDetail({required this.recipients, required this.offers, required this.history});
+  final List<AdminNowRecipient> recipients;
+  final List<NowOffer> offers;
+  final List<({NowStatus? from, NowStatus to, DateTime at, String? note})> history;
+}
+
+class AdminNowRecipient {
+  const AdminNowRecipient({required this.business, required this.distanceKm, required this.available, this.seenAt, this.declinedAt, required this.notifiedAt});
+  final BizRef business;
+  final double distanceKm;
+  final int available;
+  final DateTime notifiedAt;
+  final DateTime? seenAt;
+  final DateTime? declinedAt;
+}
