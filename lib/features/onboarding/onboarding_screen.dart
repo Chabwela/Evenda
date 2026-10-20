@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -165,7 +164,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       };
 
   Future<void> _pickLogo() async {
-    final f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 800, imageQuality: 85);
+    final f = (await pickPhotos(context, title: 'Business logo', maxWidth: 800, imageQuality: 85)).firstOrNull;
     if (f == null || !mounted) return;
     final bytes = await f.readAsBytes();
     final b = ref.read(backendProvider).business;
@@ -177,7 +176,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _uploadDoc(String type) async {
-    final f = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
+    // Full resolution: staff must be able to read the small print.
+    final f = (await pickPhotos(context, title: 'Verification document', maxWidth: null, imageQuality: 90)).firstOrNull;
     if (f == null || !mounted || _bizId == null) return;
     final bytes = await f.readAsBytes();
     if (!mounted) return;

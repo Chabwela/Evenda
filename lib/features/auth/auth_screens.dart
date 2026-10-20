@@ -112,13 +112,6 @@ class WelcomeScreen extends ConsumerWidget {
       ),
       const SizedBox(height: EvSpace.x6),
       Align(alignment: Alignment.center, child: Text('Made in Lusaka · DanTech Solutions Group', style: EvType.caption)),
-      Align(
-        alignment: Alignment.center,
-        child: TextButton(
-          onPressed: () => context.push('/admin/login'),
-          child: Text('Evenda staff sign in', style: EvType.caption.copyWith(color: EvColors.ink3, decoration: TextDecoration.underline)),
-        ),
-      ),
     ]);
 
     return Scaffold(

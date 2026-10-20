@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -87,7 +86,7 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
   }
 
   Future<void> _changeLogo() async {
-    final f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 800, imageQuality: 85);
+    final f = (await pickPhotos(context, title: 'Business logo', maxWidth: 800, imageQuality: 85)).firstOrNull;
     if (f == null || !mounted) return;
     final bytes = await f.readAsBytes();
     if (!mounted) return;
@@ -113,7 +112,8 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
       ('other', 'Other', null),
     ]);
     if (type == null || !mounted) return;
-    final f = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
+    // Full resolution: staff must be able to read the small print.
+    final f = (await pickPhotos(context, title: 'Verification document', maxWidth: null, imageQuality: 90)).firstOrNull;
     if (f == null || !mounted) return;
     final bytes = await f.readAsBytes();
     if (!mounted) return;

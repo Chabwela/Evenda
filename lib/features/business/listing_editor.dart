@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../app/providers.dart';
@@ -72,7 +71,7 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
 
   Future<void> _addPhotos() async {
     final backend = ref.read(backendProvider);
-    final files = await ImagePicker().pickMultiImage(maxWidth: 1600, imageQuality: 82, limit: 8);
+    final files = await pickPhotos(context, title: 'Add listing photos', multiple: true);
     if (files.isEmpty || !mounted) return;
     setState(() => _uploading = true);
     final list = <(Uint8List, String)>[];
