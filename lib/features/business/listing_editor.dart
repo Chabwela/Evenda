@@ -12,10 +12,19 @@ import '../../domain/models.dart';
 /// kind: services describe capacity and portfolio, never stock counts.
 /// Editing a quantity here is recorded as a stock correction; it never
 /// reserves or releases anything.
+/// item: what the business owns (photos, name, category, quantity) — My stock.
+/// offer: how a rental item is sold (price, how many offered, terms) — marketplace.
+/// full: everything on one form (services, packages, a new item listed at once).
+enum ListingEditorMode { item, offer, full }
+
 class ListingEditorScreen extends ConsumerStatefulWidget {
-  const ListingEditorScreen({super.key, this.id, this.kind});
+  const ListingEditorScreen({super.key, this.id, this.kind, this.mode});
   final String? id;
   final String? kind;
+
+  /// Null: an existing stock-tracked rental opens as [ListingEditorMode.offer],
+  /// anything else as [ListingEditorMode.full].
+  final ListingEditorMode? mode;
 
   @override
   ConsumerState<ListingEditorScreen> createState() => _ListingEditorScreenState();
@@ -41,7 +50,10 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
   }
 
   Future<void> _load() async {
-    final biz = ref.read(myBusinessProvider).value!;
+    // Wait for the business rather than assume it's loaded (deep links,
+    // notifications and fast navigation can open this screen first).
+    final biz = await ref.read(myBusinessProvider.future);
+    if (biz == null || !mounted) return;
     if (widget.id == null) {
       final kind = OfferingType.parse(widget.kind ?? (biz.rents ? 'rental' : 'service'));
       setState(() => _d = ListingDraft(
@@ -69,6 +81,11 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
 
   bool get _isService => _d!.kind != OfferingType.rental;
 
+  ListingEditorMode get _mode =>
+      widget.mode ?? (_original != null && _original!.kind == OfferingType.rental && _original!.tracksStock ? ListingEditorMode.offer : ListingEditorMode.full);
+  bool get _showItem => _mode != ListingEditorMode.offer;
+  bool get _showOffer => _mode != ListingEditorMode.item;
+
   Future<void> _addPhotos() async {
     final backend = ref.read(backendProvider);
     final files = await pickPhotos(context, title: 'Add listing photos', multiple: true);
@@ -89,7 +106,7 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
   }
 
   Future<void> _save(ListingStatus status) async {
-    if (status == ListingStatus.published && !_form.currentState!.validate()) return;
+    if ((status == ListingStatus.published || _mode == ListingEditorMode.item) && !_form.currentState!.validate()) return;
     final d = _d!
       ..title = _title.text
       ..description = _desc.text
@@ -121,9 +138,11 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
       if (widget.id == null) return api.create(d);
       await api.update(widget.id!, d, basedOn: _original);
       return widget.id!;
-    }, success: status == ListingStatus.published
-        ? (_original?.status == ListingStatus.published ? 'Listing updated' : 'Published — vendors following this category will be told')
-        : 'Saved as ${status.label.toLowerCase()}');
+    }, success: _mode == ListingEditorMode.item
+        ? (widget.id == null ? 'Added to your stock' : 'Item saved')
+        : status == ListingStatus.published
+            ? (_original?.status == ListingStatus.published ? 'Listing updated' : 'Live — vendors following this category will be told')
+            : 'Saved, not on the marketplace yet');
     if (!mounted) return;
     setState(() => _busy = false);
     if (id != null) context.pop();
@@ -141,9 +160,11 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.id == null
-            ? 'New ${d.kind == OfferingType.rental ? 'rental item' : d.kind.name}'
-            : (_original!.status == ListingStatus.published ? 'Marketplace listing' : 'List on the marketplace')),
+        title: Text(switch (_mode) {
+          ListingEditorMode.item => widget.id == null ? 'New stock item' : 'Stock item',
+          ListingEditorMode.offer => _original!.status == ListingStatus.published ? 'Marketplace listing' : 'List on the marketplace',
+          ListingEditorMode.full => widget.id == null ? 'New ${d.kind == OfferingType.rental ? 'rental item' : d.kind.name}' : 'Edit listing',
+        }),
         actions: [
           if (_original != null) Padding(padding: const EdgeInsets.only(right: 4), child: StatusPill(_original!.status.label, tone: toneForListing(_original!.status), dense: true)),
           if (_original != null && _original!.status != ListingStatus.archived)
@@ -183,6 +204,11 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
                     style: EvType.small.copyWith(color: EvColors.danger)),
               ),
             ),
+          if (_mode == ListingEditorMode.offer) _ItemSummary(listing: _original!, onEdit: () async {
+            await context.push('/business/stock/${_original!.id}');
+            if (mounted) _load();
+          }),
+          if (_showItem) ...[
           // Photos
           Text(_isService ? 'PORTFOLIO' : 'PHOTOS', style: EvType.overline),
           const SizedBox(height: EvSpace.x2),
@@ -253,7 +279,9 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
             ),
           ),
           const SizedBox(height: 6),
-          Text('Real photos of your own stock get far more requests. Long-press to reorder.', style: EvType.caption),
+          Text(_isService
+              ? 'Photos of your past work get far more requests. Long-press to reorder.'
+              : 'Photos of your own stock. They appear on the marketplace when you list the item. Long-press to reorder.', style: EvType.caption),
           gap,
           EvField(
             label: _isService ? 'Service name' : 'Item name',
@@ -279,6 +307,8 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
             EvField(label: 'Included in the package', controller: _pkg, maxLines: 6, minLines: 3, hint: 'One item per line, e.g.\n100 Chiavari chairs\n10 round tables with linen'),
           ],
 
+          ],
+          if (_showOffer) ...[
           // Pricing
           const SectionHeader('Pricing', padding: EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
           Wrap(spacing: 8, runSpacing: 8, children: [
@@ -299,6 +329,30 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
           const SizedBox(height: EvSpace.x4),
           EvField(label: 'Deposit', controller: _deposit, prefixText: 'K ', optional: true, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly]),
 
+          if (!_isService) ...[
+            const SectionHeader('Offered to other vendors', padding: EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
+            EvSwitchRow(
+              title: 'Offer everything in service',
+              subtitle: d.listedQuantity == null
+                  ? 'Other vendors can book any unit that is free on their dates'
+                  : 'Keep some back for your own jobs: other vendors can book at most ${d.listedQuantity} on any day',
+              value: d.listedQuantity == null,
+              onChanged: (all) => setState(() => d.listedQuantity = all ? null : (d.totalQuantity > 1 ? (d.totalQuantity * 0.75).round() : d.totalQuantity)),
+            ),
+            if (d.listedQuantity != null)
+              EvQuantityStepper(
+                value: d.listedQuantity!.clamp(0, d.totalQuantity < 1 ? 1 : d.totalQuantity),
+                min: 0,
+                max: d.totalQuantity < 1 ? 1 : d.totalQuantity,
+                step: d.totalQuantity >= 50 ? 10 : 1,
+                label: 'Most other vendors can book on one day',
+                helper: 'You own ${d.totalQuantity}. Your own jobs can still use all of them.',
+                onChanged: (v) => setState(() => d.listedQuantity = v),
+              ),
+          ],
+          ],
+
+          if (_showItem) ...[
           // Quantity / capacity
           SectionHeader(_isService ? 'Capacity' : 'Stock', padding: const EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
           if (!_isService) ...[
@@ -331,23 +385,73 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
             if (d.tracksStock) EvQuantityStepper(value: d.totalQuantity, min: 1, max: 20, label: 'Jobs you can take on one day', onChanged: (v) => setState(() => d.totalQuantity = v)),
           ],
 
+          ],
+          if (_showOffer) ...[
           const SectionHeader('Terms', padding: EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
           EvField(label: 'Hire / service terms', controller: _terms, maxLines: 5, minLines: 3, optional: true,
               hint: 'Collection and return times, breakages, cancellation, deposits'),
+          ],
         ]),
       ),
       bottomSheet: Container(
         decoration: const BoxDecoration(color: EvColors.warmWhite, border: Border(top: BorderSide(color: EvColors.sand))),
         padding: EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, EvSpace.x3 + MediaQuery.paddingOf(context).bottom),
-        child: Row(children: [
-          if (_original == null || _original!.status != ListingStatus.published) ...[
-            Expanded(child: EvButton('Save draft', kind: EvButtonKind.secondary, onPressed: _busy ? null : () => _save(ListingStatus.draft))),
-            const SizedBox(width: 10),
+        child: _mode == ListingEditorMode.item
+            // Stock item: saving never changes whether it is on the marketplace.
+            ? EvButton(widget.id == null ? 'Add to my stock' : 'Save item', expand: true, loading: _busy, icon: LucideIcons.check,
+                onPressed: () => _save(_original?.status ?? ListingStatus.draft))
+            : Row(children: [
+                if (_original == null || _original!.status != ListingStatus.published) ...[
+                  Expanded(child: EvButton('Save, don’t show', kind: EvButtonKind.secondary, onPressed: _busy ? null : () => _save(ListingStatus.draft))),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: EvButton(_original?.status == ListingStatus.published ? 'Save changes' : 'Show on marketplace', expand: true, loading: _busy, icon: LucideIcons.store,
+                      onPressed: () => _save(ListingStatus.published)),
+                ),
+              ]),
+      ),
+    );
+  }
+}
+
+/// In the marketplace editor: the stock item being listed, read-only, with a
+/// way to change its photos and details in My stock.
+class _ItemSummary extends StatelessWidget {
+  const _ItemSummary({required this.listing, required this.onEdit});
+  final Listing listing;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = listing;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: EvSpace.x2),
+      child: EvSurface(
+        onTap: onEdit,
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            EvPhoto(l.coverPhoto, width: 64, height: 64, radius: EvRadius.sm, icon: categoryIcon(l.categoryId)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('FROM MY STOCK', style: EvType.overline.copyWith(color: EvColors.forest)),
+                Text(l.title, style: EvType.bodyStrong, maxLines: 2, overflow: TextOverflow.ellipsis),
+                Text('${l.totalQuantity} owned · ${l.usable} in service · ${l.photos.length} photo${l.photos.length == 1 ? '' : 's'}', style: EvType.caption),
+              ]),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            const Icon(LucideIcons.pencil, size: 14, color: EvColors.forest),
+            const SizedBox(width: 6),
+            Text('Edit photos & item details in My stock', style: EvType.smallStrong.copyWith(color: EvColors.forest)),
+          ]),
+          if (l.photos.isEmpty) ...[
+            const SizedBox(height: 8),
+            Text('No photos yet. Listings with photos get far more requests.', style: EvType.caption.copyWith(color: EvColors.warning)),
           ],
-          Expanded(
-            child: EvButton(_original?.status == ListingStatus.published ? 'Save changes' : 'Publish', expand: true, loading: _busy, icon: LucideIcons.send,
-                onPressed: () => _save(ListingStatus.published)),
-          ),
         ]),
       ),
     );

@@ -9,7 +9,6 @@ import '../../data/backend.dart';
 import '../../design/ev.dart';
 import '../../domain/models.dart';
 import '../shared/feed_cards.dart';
-import 'inventory_screen.dart' show addStockItem;
 
 final myListingsProvider = FutureProvider.autoDispose<List<Listing>>((ref) async {
   ref.watchDomains(const [DataDomain.listings]);
@@ -47,7 +46,8 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
   bool _picked = false;
 
   Future<void> _add(List<Listing> all) async {
-    final biz = ref.read(myBusinessProvider).value!;
+    final biz = ref.read(myBusinessProvider).value;
+    if (biz == null) return;
     final kinds = biz.offeringTypes.isEmpty ? OfferingType.values.toSet() : biz.offeringTypes;
     final unlisted = all.where((l) => l.kind == OfferingType.rental && l.tracksStock && l.status == ListingStatus.draft).toList();
     final choice = await showEvSheet<String>(
@@ -67,7 +67,7 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
             EvRow(
               leading: const IconTile(LucideIcons.packagePlus),
               title: 'New rental item',
-              subtitle: 'Adds it to your stock and lists it',
+              subtitle: 'Adds it to your stock and lists it in one go',
               onTap: () => Navigator.pop(c, 'rental'),
             ),
           ],
@@ -153,7 +153,7 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
           title: 'Nothing on the marketplace yet',
           body: 'Start with what you own: add your stock, then choose which items other vendors can see and book.',
           action: 'Add stock',
-          onAction: () => addStockItem(context, ref),
+          onAction: () => context.push('/business/stock/new'),
         ),
         data: (list) {
           final shown = list.where(_show.matches).toList();
@@ -264,7 +264,9 @@ class _ListingCard extends ConsumerWidget {
                 l.isService
                     ? '${l.totalQuantity} job${l.totalQuantity == 1 ? '' : 's'} per day'
                     : l.tracksStock
-                        ? '${l.usable} of ${l.totalQuantity} in service · from My stock'
+                        ? (l.listedQuantity == null
+                            ? 'Offering all ${l.usable} in service · from My stock'
+                            : 'Offering up to ${l.offeredQuantity} of ${l.totalQuantity} · from My stock')
                         : categoryById(l.categoryId).name,
                 style: EvType.caption,
               ),

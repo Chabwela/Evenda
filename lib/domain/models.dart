@@ -354,6 +354,7 @@ class Listing {
     this.damagedQuantity = 0,
     this.inspectionQuantity = 0,
     this.tracksStock = true,
+    this.listedQuantity,
     this.serviceAreaKm,
     this.packageItems = const [],
     this.photos = const [],
@@ -383,6 +384,9 @@ class Listing {
   final int damagedQuantity;
   final int inspectionQuantity;
   final bool tracksStock;
+
+  /// How many the business offers to other vendors (null = all usable).
+  final int? listedQuantity;
   final int? serviceAreaKm;
   final List<String> packageItems;
 
@@ -397,6 +401,9 @@ class Listing {
   final BizRef? business;
 
   int get usable => totalQuantity - damagedQuantity - inspectionQuantity;
+
+  /// What other vendors can book at most: the offer cap or everything usable.
+  int get offeredQuantity => listedQuantity == null ? usable : (listedQuantity! < usable ? listedQuantity! : usable);
   String? get coverPhoto => photos.isEmpty ? null : photos.first;
   bool get isService => kind == OfferingType.service;
 
@@ -424,6 +431,7 @@ class Listing {
       damagedQuantity: r['damaged_quantity'] ?? 0,
       inspectionQuantity: r['inspection_quantity'] ?? 0,
       tracksStock: r['tracks_stock'] ?? true,
+      listedQuantity: (r['listed_quantity'] as num?)?.toInt(),
       serviceAreaKm: r['service_area_km'],
       packageItems: [for (final p in (r['package_items'] as List? ?? const [])) '$p'],
       photos: [for (final p in photos) photoUrl?.call(p['storage_path']) ?? p['storage_path'] as String],
@@ -463,6 +471,7 @@ class Listing {
         damagedQuantity: damagedQuantity ?? this.damagedQuantity,
         inspectionQuantity: inspectionQuantity ?? this.inspectionQuantity,
         tracksStock: tracksStock,
+        listedQuantity: listedQuantity,
         serviceAreaKm: serviceAreaKm,
         packageItems: packageItems,
         photos: photos ?? this.photos,
@@ -491,6 +500,7 @@ class ListingDraft {
     this.condition,
     this.totalQuantity = 0,
     this.tracksStock = true,
+    this.listedQuantity,
     this.serviceAreaKm,
     this.packageItems = const [],
     this.photos = const [],
@@ -510,6 +520,7 @@ class ListingDraft {
   String? condition;
   int totalQuantity;
   bool tracksStock;
+  int? listedQuantity;
   int? serviceAreaKm;
   List<String> packageItems;
   List<String> photos;
@@ -529,6 +540,7 @@ class ListingDraft {
         condition: l.condition,
         totalQuantity: l.totalQuantity,
         tracksStock: l.tracksStock,
+        listedQuantity: l.listedQuantity,
         serviceAreaKm: l.serviceAreaKm,
         packageItems: [...l.packageItems],
         photos: [...l.photos],
@@ -549,6 +561,7 @@ class ListingDraft {
         'condition': condition,
         'total_quantity': totalQuantity,
         'tracks_stock': tracksStock,
+        'listed_quantity': listedQuantity,
         'service_area_km': serviceAreaKm,
         'package_items': packageItems,
       };

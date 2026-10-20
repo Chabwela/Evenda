@@ -523,6 +523,9 @@ class _SbListings implements ListingApi {
   @override
   Future<String> create(ListingDraft d) async {
     final id = await b.rpc('create_listing', {'p': d.toJson()}) as String;
+    if (d.listedQuantity != null) {
+      await b.call(() => b.client.from('listings').update({'listed_quantity': d.listedQuantity}).eq('id', id));
+    }
     await _syncPhotos(id, d.photos);
     b.touch({DataDomain.listings, DataDomain.discovery});
     return id;

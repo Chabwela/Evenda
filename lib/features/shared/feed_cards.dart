@@ -111,7 +111,7 @@ class ListingResultCard extends StatelessWidget {
                   if (result.available != null)
                     StatusPill('${result.available} free', tone: Tone.positive, dense: true)
                   else if (l.tracksStock && l.kind != OfferingType.service)
-                    Text('${l.usable} in stock', style: EvType.caption),
+                    Text('${l.offeredQuantity} available', style: EvType.caption),
                 ]),
                 const SizedBox(height: 2),
                 Text(

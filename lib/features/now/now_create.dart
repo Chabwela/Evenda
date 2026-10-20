@@ -24,7 +24,8 @@ class NowCreateScreen extends ConsumerStatefulWidget {
 }
 
 class _NowCreateScreenState extends ConsumerState<NowCreateScreen> {
-  late final NowRequestDraft _d;
+  NowRequestDraft? _draft;
+  NowRequestDraft get _d => _draft!;
   final _item = TextEditingController();
   final _budget = TextEditingController();
   final _notes = TextEditingController();
@@ -35,9 +36,16 @@ class _NowCreateScreenState extends ConsumerState<NowCreateScreen> {
   @override
   void initState() {
     super.initState();
-    final biz = ref.read(myBusinessProvider).value!;
+    _init();
+  }
+
+  // Waits for the business rather than assume it's loaded (this screen can be
+  // opened straight from a stock shortfall or a notification).
+  Future<void> _init() async {
+    final biz = await ref.read(myBusinessProvider.future);
+    if (biz == null || !mounted) return;
     final tomorrow = EvDates.today().add(const Duration(days: 1));
-    _d = NowRequestDraft(
+    final draft = NowRequestDraft(
       requesterId: biz.id,
       idempotencyKey: const Uuid().v4(),
       categoryId: widget.categoryId,
@@ -47,9 +55,12 @@ class _NowCreateScreenState extends ConsumerState<NowCreateScreen> {
       location: biz.location ?? kLusakaCentre,
       locationLabel: biz.neighbourhood != null ? '${biz.neighbourhood} · ${biz.name}' : biz.name,
     );
-    _item.text = widget.item ?? '';
-    _label.text = _d.locationLabel;
-    _ready = biz.location != null;
+    setState(() {
+      _draft = draft;
+      _item.text = widget.item ?? '';
+      _label.text = draft.locationLabel;
+      _ready = biz.location != null;
+    });
   }
 
   Future<void> _submit() async {
@@ -72,6 +83,7 @@ class _NowCreateScreenState extends ConsumerState<NowCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_draft == null) return Scaffold(appBar: AppBar(), body: const Center(child: CircularProgressIndicator()));
     final today = EvDates.today();
     final tomorrow = today.add(const Duration(days: 1));
     final rentalCats = kCategories.where((c) => c.kind == OfferingType.rental).toList();

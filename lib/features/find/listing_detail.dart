@@ -223,7 +223,7 @@ class _BodyState extends ConsumerState<_Body> {
                   AnimatedSize(
                     duration: EvMotion.of(context, EvMotion.base),
                     child: _from == null
-                        ? Text(l.tracksStock && !l.isService ? '${l.usable} owned in total.' : 'Choose a date to see if they’re free.', style: EvType.small)
+                        ? Text(l.tracksStock && !l.isService ? 'Up to ${l.offeredQuantity} available.' : 'Choose a date to see if they’re free.', style: EvType.small)
                         : _checking
                             ? const LinearProgressIndicator(minHeight: 2)
                             : _available == null
