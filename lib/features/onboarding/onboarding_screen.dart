@@ -119,9 +119,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       final b = ref.read(backendProvider).business;
       _bizId ??= await b.create(_name.text.trim());
       final current = await b.get(_bizId!);
-      if (_step == 3) {
-        await b.setLocation(_bizId!, _point, _precision, _hood);
-      }
       final updated = current.copyWith(
         name: _name.text.trim(),
         description: _desc.text.trim(),
@@ -137,6 +134,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         onboardingStep: (_step + 1).clamp(0, 6),
       );
       await b.update(updated);
+      // The pin goes after the profile: setting it bumps the business's
+      // version, and saving the profile from the copy read before it was
+      // refused as "someone else saved changes".
+      if (_step == 3) await b.setLocation(_bizId!, _point, _precision, _hood);
       if (_step == 1) await b.setCategories(_bizId!, [?_primary, ..._extra]);
       if (_step == 5) {
         ref.read(onboardingCelebrationProvider.notifier).set(true);
