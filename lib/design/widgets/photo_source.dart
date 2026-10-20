@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -53,5 +56,81 @@ Future<List<XFile>> pickPhotos(
           icon: LucideIcons.circleAlert);
     }
     return const [];
+  }
+}
+
+/// Verification documents vendors actually have: phone photos (incl. iPhone
+/// HEIC), scans as PDF, and Word files. Mirrors the `verification` bucket's
+/// allowed types (migration 20261020000400). Executables, archives and other
+/// formats are refused, because staff open these files on their phones.
+const kDocumentTypes = <String, String>{
+  'jpg': 'image/jpeg',
+  'jpeg': 'image/jpeg',
+  'png': 'image/png',
+  'webp': 'image/webp',
+  'heic': 'image/heic',
+  'heif': 'image/heif',
+  'pdf': 'application/pdf',
+  'doc': 'application/msword',
+  'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
+
+/// Largest document accepted (the bucket's limit).
+const kMaxDocumentBytes = 10 * 1024 * 1024;
+
+typedef PickedDocument = ({Uint8List bytes, String ext, String name});
+
+/// Camera, photo or file (PDF, Word…) for a verification document.
+/// Returns null when cancelled or when the file is refused (with a message).
+Future<PickedDocument?> pickDocument(BuildContext context, {String title = 'Verification document'}) async {
+  final choice = await showEvSheet<String>(
+    context,
+    title: title,
+    subtitle: 'Photo, PDF or Word document · up to 10 MB',
+    builder: (c) => Padding(
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, EvSpace.x6),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        EvRow(leading: const IconTile(LucideIcons.camera), title: 'Take a photo', subtitle: 'Lay it flat in good light', onTap: () => Navigator.pop(c, 'camera')),
+        const EvDivider(indent: 72),
+        EvRow(leading: const IconTile(LucideIcons.images), title: 'Choose a photo', subtitle: 'From your gallery', onTap: () => Navigator.pop(c, 'gallery')),
+        const EvDivider(indent: 72),
+        EvRow(leading: const IconTile(LucideIcons.fileText), title: 'Choose a file', subtitle: 'PDF, Word or image from your phone', onTap: () => Navigator.pop(c, 'file')),
+      ]),
+    ),
+  );
+  if (choice == null || !context.mounted) return null;
+
+  void refuse(String m) {
+    if (context.mounted) showToast(context, m, icon: LucideIcons.circleAlert);
+  }
+
+  try {
+    String name;
+    Uint8List bytes;
+    if (choice == 'file') {
+      final files = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: kDocumentTypes.keys.toList());
+      if (files.isEmpty) return null;
+      name = files.first.name;
+      bytes = await files.first.xFile.readAsBytes();
+    } else {
+      // Full resolution: staff must be able to read the small print.
+      final f = await ImagePicker().pickImage(source: choice == 'camera' ? ImageSource.camera : ImageSource.gallery, imageQuality: 90);
+      if (f == null) return null;
+      name = f.name;
+      bytes = await f.readAsBytes();
+    }
+    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    if (!kDocumentTypes.containsKey(ext)) {
+      refuse('That file type can’t be used. Upload a photo, PDF or Word document.');
+      return null;
+    }
+    if (bytes.length > kMaxDocumentBytes) {
+      refuse('That file is ${(bytes.length / 1048576).toStringAsFixed(1)} MB. The limit is 10 MB: take a photo instead, or save the PDF smaller.');
+      return null;
+    }
+    return (bytes: bytes, ext: ext, name: name);
+  } catch (_) {
+    refuse(choice == 'camera' ? 'Couldn’t open the camera.' : 'Couldn’t open that file.');
+    return null;
   }
 }

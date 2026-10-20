@@ -112,12 +112,9 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
       ('other', 'Other', null),
     ]);
     if (type == null || !mounted) return;
-    // Full resolution: staff must be able to read the small print.
-    final f = (await pickPhotos(context, title: 'Verification document', maxWidth: null, imageQuality: 90)).firstOrNull;
-    if (f == null || !mounted) return;
-    final bytes = await f.readAsBytes();
-    if (!mounted) return;
-    await guard(context, () => ref.read(backendProvider).business.uploadVerificationDocument(_b!.id, type, bytes, f.name.split('.').last.toLowerCase()),
+    final doc = await pickDocument(context);
+    if (doc == null || !mounted) return;
+    await guard(context, () => ref.read(backendProvider).business.uploadVerificationDocument(_b!.id, type, doc.bytes, doc.ext),
         success: 'Uploaded. Submit for review when you’re ready.');
   }
 

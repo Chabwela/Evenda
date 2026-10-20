@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/errors.dart';
 import '../../core/format.dart';
+import '../../design/widgets/photo_source.dart' show kDocumentTypes;
 import '../../domain/models.dart';
 import '../backend.dart';
 
@@ -446,7 +447,7 @@ class _SbBusiness implements BusinessApi {
   Future<void> uploadVerificationDocument(String businessId, String docType, Uint8List bytes, String ext) async {
     final path = '$businessId/${_uuid.v4()}.$ext';
     await b.call(() => b.client.storage.from('verification').uploadBinary(path, bytes,
-        fileOptions: sb.FileOptions(contentType: ext == 'pdf' ? 'application/pdf' : 'image/${ext == 'jpg' ? 'jpeg' : ext}')));
+        fileOptions: sb.FileOptions(contentType: kDocumentTypes[ext] ?? 'application/octet-stream')));
     await b.call(() => b.client.from('verification_documents').insert({'business_id': businessId, 'doc_type': docType, 'storage_path': path}));
   }
 

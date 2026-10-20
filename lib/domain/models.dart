@@ -1940,7 +1940,18 @@ class AdminDocument {
   DateTime? get reviewedAt => raw['reviewed_at'] == null ? null : DateTime.parse(raw['reviewed_at']).toLocal();
   String? get reviewNote => raw['review_note'];
   String? get reviewedBy => raw['reviewed_by'];
-  bool get isPdf => storagePath.toLowerCase().endsWith('.pdf');
+  String get ext => storagePath.contains('.') ? storagePath.split('.').last.toLowerCase() : '';
+
+  /// Shown in the in-app zoomable viewer; everything else (PDF, Word, HEIC)
+  /// opens in the phone's own app.
+  bool get viewInApp => const {'jpg', 'jpeg', 'png', 'webp'}.contains(ext);
+
+  String get formatLabel => switch (ext) {
+        'pdf' => 'PDF',
+        'doc' || 'docx' => 'Word document',
+        'heic' || 'heif' => 'Photo (HEIC)',
+        _ => 'Photo',
+      };
 
   String get typeLabel => switch (docType) {
         'pacra_certificate' => 'PACRA certificate',

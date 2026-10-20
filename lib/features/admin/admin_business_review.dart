@@ -196,7 +196,7 @@ class _DocumentCardState extends ConsumerState<_DocumentCard> {
     final url = await guard(context, () => ref.read(backendProvider).admin.documentUrl(widget.doc.storagePath));
     if (mounted) setState(() => _opening = false);
     if (url == null || !mounted) return;
-    if (widget.doc.isPdf) {
+    if (!widget.doc.viewInApp) {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } else {
       await Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => _ImageViewer(url: url, title: widget.doc.typeLabel)));
@@ -234,12 +234,12 @@ class _DocumentCardState extends ConsumerState<_DocumentCard> {
     return EvSurface(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          IconTile(doc.isPdf ? LucideIcons.fileText : LucideIcons.fileImage),
+          IconTile(doc.viewInApp ? LucideIcons.fileImage : LucideIcons.fileText),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(doc.typeLabel, style: EvType.bodyStrong),
-              Text('Uploaded ${EvDates.day(doc.createdAt)} · ${doc.isPdf ? 'PDF' : 'Photo'}', style: EvType.caption),
+              Text('Uploaded ${EvDates.day(doc.createdAt)} · ${doc.formatLabel}', style: EvType.caption),
             ]),
           ),
           StatusPill(label, tone: tone, dense: true),
@@ -255,7 +255,7 @@ class _DocumentCardState extends ConsumerState<_DocumentCard> {
           ),
         ],
         const SizedBox(height: EvSpace.x3),
-        EvButton(doc.isPdf ? 'Open PDF' : 'View document', kind: EvButtonKind.secondary, icon: LucideIcons.eye, expand: true, loading: _opening, onPressed: _open),
+        EvButton(doc.viewInApp ? 'View document' : 'Open ${doc.formatLabel}', kind: EvButtonKind.secondary, icon: LucideIcons.eye, expand: true, loading: _opening, onPressed: _open),
         if (widget.canReview) ...[
           const SizedBox(height: 8),
           Row(children: [

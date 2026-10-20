@@ -176,13 +176,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _uploadDoc(String type) async {
-    // Full resolution: staff must be able to read the small print.
-    final f = (await pickPhotos(context, title: 'Verification document', maxWidth: null, imageQuality: 90)).firstOrNull;
-    if (f == null || !mounted || _bizId == null) return;
-    final bytes = await f.readAsBytes();
-    if (!mounted) return;
+    final doc = await pickDocument(context);
+    if (doc == null || !mounted || _bizId == null) return;
     final ok = await guard(context, () async {
-      await ref.read(backendProvider).business.uploadVerificationDocument(_bizId!, type, bytes, f.name.split('.').last.toLowerCase());
+      await ref.read(backendProvider).business.uploadVerificationDocument(_bizId!, type, doc.bytes, doc.ext);
       return true;
     }, success: 'Document uploaded');
     if (ok == true && mounted) setState(() => _docs++);
