@@ -338,7 +338,7 @@ class _Quick extends StatelessWidget {
               Container(
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(color: EvColors.warmWhite, borderRadius: EvRadius.mdAll, border: Border.all(color: EvColors.sand)),
+                decoration: BoxDecoration(color: EvColors.warmWhite, borderRadius: EvRadius.mdAll, border: Border.all(color: EvColors.hairline)),
                 child: Icon(icon, size: 21, color: EvColors.forest),
               ),
               const SizedBox(height: 6),
@@ -356,36 +356,30 @@ class _NowBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = live.firstOrNull;
-    return Material(
-      color: EvColors.forest,
-      borderRadius: EvRadius.mdAll,
-      child: InkWell(
-        borderRadius: EvRadius.mdAll,
-        onTap: () => context.push(r == null ? '/now' : '/now/${r.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(EvSpace.x4),
-          child: Row(children: [
+    // Light card: the bronze mark carries the urgency, not a dark block.
+    return EvSurface(
+      onTap: () => context.push(r == null ? '/now' : '/now/${r.id}'),
+      padding: const EdgeInsets.all(EvSpace.x4),
+      child: Row(children: [
             Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(color: EvColors.bronze, borderRadius: EvRadius.smAll),
-              child: const Icon(LucideIcons.zap, color: EvColors.inkOnDark, size: 22),
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(color: EvColors.bronzeTint, shape: BoxShape.circle),
+              child: const Icon(LucideIcons.zap, color: EvColors.bronzeDeep, size: 20),
             ),
             const SizedBox(width: EvSpace.x3),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(r == null ? 'Short on stock?' : 'Evenda Now · ${r.status.label}', style: EvType.bodyStrong.copyWith(color: EvColors.inkOnDark)),
+                Text(r == null ? 'Short on stock?' : 'Evenda Now · ${r.status.label}', style: EvType.bodyStrong),
                 const SizedBox(height: 2),
                 Text(
                   r == null ? 'Evenda Now asks nearby suppliers who have it free.' : '${r.quantity} × ${r.itemDescription} · ${plural(r.recipientsCount, 'supplier')} notified',
-                  style: EvType.small.copyWith(color: EvColors.sand),
+                  style: EvType.small,
                 ),
               ]),
             ),
-            const Icon(LucideIcons.arrowRight, color: EvColors.inkOnDark, size: 20),
-          ]),
-        ),
-      ),
+            const Icon(LucideIcons.arrowRight, color: EvColors.bronzeDeep, size: 20),
+      ]),
     );
   }
 }

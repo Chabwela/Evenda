@@ -32,21 +32,19 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: EvColors.forest,
-      appBar: AppBar(backgroundColor: EvColors.forest, foregroundColor: EvColors.inkOnDark),
+      appBar: AppBar(),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: ListView(shrinkWrap: true, padding: const EdgeInsets.all(EvSpace.gutter), children: [
-            const Align(alignment: Alignment.centerLeft, child: EvendaLogo(size: 30, onDark: true)),
+            const Align(alignment: Alignment.centerLeft, child: EvendaLogo(size: 30)),
             const SizedBox(height: EvSpace.x4),
-            Text('Platform administration', style: EvType.display.copyWith(color: EvColors.inkOnDark)),
+            Text('Platform administration', style: EvType.display),
             const SizedBox(height: EvSpace.x2),
-            Text('For Evenda staff. Access is granted by an administrator and every action is recorded.', style: EvType.small.copyWith(color: EvColors.sand)),
+            Text('For Evenda staff. Access is granted by an administrator and every action is recorded.', style: EvType.small),
             const SizedBox(height: EvSpace.x6),
-            Container(
+            EvSurface(
               padding: const EdgeInsets.all(EvSpace.x5),
-              decoration: BoxDecoration(color: EvColors.warmWhite, borderRadius: EvRadius.lgAll),
               child: AutofillGroup(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   EvField(label: 'Work email', controller: _email, keyboardType: TextInputType.emailAddress, textCapitalization: TextCapitalization.none, prefixIcon: LucideIcons.mail),

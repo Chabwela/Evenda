@@ -41,16 +41,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   Widget build(BuildContext context) {
     final data = ref.watch(_inventoryProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('My stock'), centerTitle: false),
-      floatingActionButton: data.hasValue && data.value!.$1.isNotEmpty
-          ? FloatingActionButton.extended(
-              onPressed: () => context.push('/business/stock/new'),
-              backgroundColor: EvColors.forest,
-              foregroundColor: EvColors.inkOnDark,
-              icon: const Icon(LucideIcons.packagePlus),
-              label: const Text('Add item'),
-            )
-          : null,
+      appBar: AppBar(
+        title: const Text('My stock'),
+        centerTitle: false,
+        actions: [
+          TextButton.icon(onPressed: () => context.push('/business/stock/new'), icon: const Icon(LucideIcons.plus, size: 18), label: const Text('Add item')),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: AsyncView(
         value: data,
         onRetry: () => ref.invalidate(_inventoryProvider),
@@ -86,42 +84,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           return ListView(
             padding: const EdgeInsets.only(bottom: 96),
             children: [
-              // What you own, at a glance.
-              Container(
-                margin: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, 0),
-                padding: const EdgeInsets.all(EvSpace.x4),
-                decoration: BoxDecoration(color: EvColors.forest, borderRadius: EvRadius.lgAll),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('WHAT YOU OWN', style: EvType.overline.copyWith(color: EvColors.sand)),
-                    const SizedBox(height: 4),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        EvAnimatedCount(
-                          value: owned,
-                          style: EvType.display.copyWith(color: EvColors.inkOnDark),
-                        ),
-                        const SizedBox(width: 8),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Text('units · ${plural(listings.length, 'item')}', style: EvType.small.copyWith(color: EvColors.sand)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: EvSpace.x3),
-                    Row(
-                      children: [
-                        Expanded(child: _HeadStat('Free today', free, const Color(0xFFC9A27A))),
-                        Expanded(child: _HeadStat('Out on jobs', out, EvColors.inkOnDark)),
-                        Expanded(child: _HeadStat('Need attention', attention, attention > 0 ? const Color(0xFFE8B4A4) : EvColors.inkOnDark)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              if (conflicts.isNotEmpty)
+              // What you own, at a glance: numbers on the page, not in a block.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x1, EvSpace.gutter, EvSpace.x3),
+              child: Text('${plural(listings.length, 'item')} · $owned units owned', style: EvType.small),
+            ),
+            EvStatRow(stats: [
+              EvStat('Free today', '$free', highlight: true),
+              EvStat('Out on jobs', '$out'),
+              EvStat('Need attention', '$attention', alert: attention > 0, onTap: attention > 0 ? () => setState(() => _filter = _StockFilter.attention) : null),
+            ]),
+            if (conflicts.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, 0),
                   child: EvSurface(
@@ -197,24 +170,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       ),
     );
   }
-}
-
-class _HeadStat extends StatelessWidget {
-  const _HeadStat(this.label, this.value, this.color);
-  final String label;
-  final int value;
-  final Color color;
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      EvAnimatedCount(
-        value: value,
-        style: EvType.number.copyWith(color: color),
-      ),
-      Text(label, style: EvType.caption.copyWith(color: EvColors.sand)),
-    ],
-  );
 }
 
 class _StockCard extends ConsumerWidget {
@@ -356,7 +311,7 @@ class _StockCard extends ConsumerWidget {
       decoration: BoxDecoration(
         color: EvColors.warmWhite,
         borderRadius: EvRadius.mdAll,
-        border: Border.all(color: highlighted ? EvColors.warning : EvColors.sand, width: highlighted ? 1.6 : 1),
+        border: Border.all(color: highlighted ? EvColors.warning : EvColors.hairline, width: highlighted ? 1.6 : 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

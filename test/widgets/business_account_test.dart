@@ -45,7 +45,7 @@ void main() {
 
   testWidgets('Business: no Delete account; Sign out stands alone', (t) async {
     final b = await open(t, const BusinessScreen());
-    expect(find.text('THIS MONTH'), findsOneWidget);
+    expect(find.text('This month'), findsOneWidget);
     expect(find.textContaining('Delete'), findsNothing);
     await t.scrollUntilVisible(find.text('Sign out'), 300, scrollable: find.byType(Scrollable).first);
     expect(find.text('Account & privacy'), findsOneWidget);
@@ -57,7 +57,7 @@ void main() {
   testWidgets('Account & privacy: deletion is last, in its own section', (t) async {
     final b = await open(t, const AccountScreen());
     await t.scrollUntilVisible(find.text('Delete account…'), 300, scrollable: find.byType(Scrollable).first);
-    expect(find.text('LEAVING EVENDA'), findsOneWidget);
+    expect(find.text('Leaving Evenda'), findsOneWidget);
     expect(find.text('Sign out'), findsNothing);
     expect(t.takeException(), isNull);
     b.dispose();

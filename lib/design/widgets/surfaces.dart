@@ -141,11 +141,12 @@ class SectionHeader extends StatelessWidget {
   final EdgeInsets? padding;
 
   @override
+  // Sentence case and dark: hierarchy comes from size and weight, not capitals.
   Widget build(BuildContext context) => Padding(
         padding: padding ?? const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x6, EvSpace.x2, EvSpace.x2),
         child: Row(children: [
-          Text(title.toUpperCase(), style: EvType.overline),
-          if (count != null) ...[const SizedBox(width: 6), Text('$count', style: EvType.overline.copyWith(color: EvColors.bronze))],
+          Flexible(child: Text(_sentence(title), style: EvType.headline.copyWith(fontSize: 16), maxLines: 2, overflow: TextOverflow.ellipsis)),
+          if (count != null) ...[const SizedBox(width: 6), Text('$count', style: EvType.headline.copyWith(fontSize: 16, color: EvColors.ink3, fontWeight: FontWeight.w500))],
           const Spacer(),
           if (action != null)
             TextButton(
@@ -155,6 +156,55 @@ class SectionHeader extends StatelessWidget {
             ),
         ]),
       );
+}
+
+/// "BOOKINGS & PAYMENTS" or "Bookings & payments" -> "Bookings & payments".
+String _sentence(String t) {
+  if (t.isEmpty || t != t.toUpperCase()) return t;
+  final lower = t.toLowerCase();
+  return lower[0].toUpperCase() + lower.substring(1);
+}
+
+/// Numbers that matter, laid out on the page: dark figures, muted labels,
+/// no coloured card. Used for dashboard and summary lines everywhere.
+class EvStatRow extends StatelessWidget {
+  const EvStatRow({super.key, required this.stats, this.padding = const EdgeInsets.symmetric(horizontal: EvSpace.gutter)});
+  final List<EvStat> stats;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: padding,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          for (final (i, s) in stats.indexed) ...[
+            if (i > 0) Container(width: 1, height: 36, margin: const EdgeInsets.symmetric(horizontal: EvSpace.x3), color: EvColors.hairline),
+            Expanded(
+              child: InkWell(
+                onTap: s.onTap,
+                borderRadius: EvRadius.smAll,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(s.value, style: EvType.number.copyWith(fontSize: 20, color: s.alert ? EvColors.danger : (s.highlight ? EvColors.forest : EvColors.ink))),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(s.label, style: EvType.caption, maxLines: 2, overflow: TextOverflow.ellipsis),
+                ]),
+              ),
+            ),
+          ],
+        ]),
+      );
+}
+
+class EvStat {
+  const EvStat(this.label, this.value, {this.alert = false, this.highlight = false, this.onTap});
+  final String label;
+  final String value;
+  final bool alert;
+  final bool highlight;
+  final VoidCallback? onTap;
 }
 
 /// Warm-white surface. Uses a hairline border rather than a shadow, except
@@ -175,7 +225,7 @@ class EvSurface extends StatelessWidget {
       padding: margin ?? EdgeInsets.zero,
       child: Material(
         color: color ?? EvColors.warmWhite,
-        shape: RoundedRectangleBorder(borderRadius: r, side: const BorderSide(color: EvColors.sand)),
+        shape: RoundedRectangleBorder(borderRadius: r, side: const BorderSide(color: EvColors.hairline)),
         clipBehavior: Clip.antiAlias,
         child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
       ),

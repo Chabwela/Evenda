@@ -331,7 +331,7 @@ class _LiveTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        decoration: BoxDecoration(color: EvColors.warmWhite, borderRadius: BorderRadius.circular(EvRadius.pill), border: Border.all(color: EvColors.sand)),
+        decoration: BoxDecoration(color: EvColors.warmWhite, borderRadius: BorderRadius.circular(EvRadius.pill), border: Border.all(color: EvColors.hairline)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Container(
             width: 7,

@@ -14,8 +14,9 @@ abstract final class EvColors {
   static const forestTint = Color(0xFFE2EADF); // selected rows, primary containers
   static const forestWash = Color(0xFFEFF3EC);
 
-  static const cream = Color(0xFFF7F3EA); // app canvas
-  static const warmWhite = Color(0xFFFCFBF7); // content surfaces
+  static const cream = Color(0xFFFDFCF7); // app canvas: warm off-white, never a coloured block
+  static const warmWhite = Color(0xFFFFFFFF); // content surfaces
+  static const hairline = Color(0xFFEEE8DB); // card borders and row dividers (lighter than sand)
   static const sand = Color(0xFFE8DFCC); // dividers, skeletons, quiet fills
   static const sandDeep = Color(0xFFD9CDB4);
 

@@ -44,7 +44,7 @@ void main() {
   testWidgets('My stock: what you own, quick actions, marketplace status', (t) async {
     final b = await open(t, const InventoryScreen());
     expect(find.text('My stock'), findsOneWidget);
-    expect(find.text('WHAT YOU OWN'), findsOneWidget);
+    expect(find.text('Free today'), findsOneWidget);
     expect(find.text('Add item'), findsOneWidget);
     expect(find.textContaining('marketplace'), findsWidgets);
     expect(t.takeException(), isNull);
@@ -55,9 +55,9 @@ void main() {
   testWidgets('On the marketplace: live count, switches, list from stock', (t) async {
     final b = await open(t, const ListingsScreen());
     expect(find.text('On the marketplace'), findsOneWidget);
-    expect(find.text('VENDORS CAN SEE'), findsOneWidget);
+    expect(find.textContaining('what other vendors see'), findsOneWidget);
     expect(find.byType(Switch), findsWidgets);
-    expect(find.text('List something'), findsOneWidget);
+    expect(find.text('List'), findsOneWidget);
     expect(t.takeException(), isNull);
     b.dispose();
     await t.pumpWidget(const SizedBox());

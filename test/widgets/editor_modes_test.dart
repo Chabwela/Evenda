@@ -51,8 +51,8 @@ void main() {
     expect(find.text('PHOTOS'), findsOneWidget);
     expect(find.text('Save item'), findsOneWidget);
     expect(await has(t, find.text('Total you own')), isTrue);
-    expect(find.text('PRICING'), findsNothing);
-    expect(find.text('OFFERED TO OTHER VENDORS'), findsNothing);
+    expect(find.text('Pricing'), findsNothing);
+    expect(find.text('Offered to other vendors'), findsNothing);
     expect(t.takeException(), isNull);
     b.dispose();
     await t.pumpWidget(const SizedBox());
@@ -62,7 +62,7 @@ void main() {
     final b = await open(t, ListingEditorMode.offer);
     expect(find.text('FROM MY STOCK'), findsOneWidget);
     expect(find.text('PHOTOS'), findsNothing);
-    expect(find.text('PRICING'), findsOneWidget);
+    expect(find.text('Pricing'), findsOneWidget);
     expect(await has(t, find.text('Offer everything in service')), isTrue);
     expect(find.text('Total you own'), findsNothing);
     expect(t.takeException(), isNull);

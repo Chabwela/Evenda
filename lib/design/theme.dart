@@ -139,7 +139,7 @@ abstract final class EvTheme {
         titleTextStyle: EvType.title,
         systemOverlayStyle: SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
       ),
-      dividerTheme: const DividerThemeData(color: EvColors.sand, thickness: 1, space: 1),
+      dividerTheme: const DividerThemeData(color: EvColors.hairline, thickness: 1, space: 1),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: EvColors.warmWhite,

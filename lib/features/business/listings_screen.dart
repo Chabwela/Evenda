@@ -134,16 +134,15 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
     final unlistedStock = all.where((l) => l.kind == OfferingType.rental && l.tracksStock && l.status == ListingStatus.draft).length;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('On the marketplace'), centerTitle: false),
-      floatingActionButton: data.hasValue && all.isNotEmpty
-          ? FloatingActionButton.extended(
-              onPressed: () => _add(all),
-              backgroundColor: EvColors.forest,
-              foregroundColor: EvColors.inkOnDark,
-              icon: const Icon(LucideIcons.store),
-              label: const Text('List something'),
-            )
-          : null,
+      appBar: AppBar(
+        title: const Text('On the marketplace'),
+        centerTitle: false,
+        actions: [
+          if (data.hasValue && all.isNotEmpty)
+            TextButton.icon(onPressed: () => _add(all), icon: const Icon(LucideIcons.plus, size: 18), label: const Text('List')),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: AsyncView(
         value: data,
         onRetry: () => ref.invalidate(myListingsProvider),
@@ -157,42 +156,24 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
         ),
         data: (list) {
           final shown = list.where(_show.matches).toList();
-          return ListView(padding: const EdgeInsets.only(bottom: 96), children: [
-            Container(
-              margin: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, 0),
-              padding: const EdgeInsets.all(EvSpace.x4),
-              decoration: BoxDecoration(color: EvColors.forest, borderRadius: EvRadius.lgAll),
-              child: Row(children: [
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('VENDORS CAN SEE', style: EvType.overline.copyWith(color: EvColors.sand)),
-                    const SizedBox(height: 4),
-                    Text('${live.length} live listing${live.length == 1 ? '' : 's'}', style: EvType.displaySm.copyWith(color: EvColors.inkOnDark)),
-                    const SizedBox(height: 2),
-                    Text('Stock counts come from My stock.', style: EvType.caption.copyWith(color: EvColors.sand)),
-                  ]),
-                ),
-                const Icon(LucideIcons.store, size: 40, color: Color(0xFFC9A27A)),
-              ]),
+          return ListView(padding: const EdgeInsets.only(bottom: EvSpace.x10), children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x1, EvSpace.gutter, 0),
+              child: Text.rich(TextSpan(style: EvType.body.copyWith(color: EvColors.ink2), children: [
+                TextSpan(text: '${live.length} live', style: EvType.bodyStrong.copyWith(color: EvColors.forest)),
+                const TextSpan(text: ' · what other vendors see. Stock counts come from My stock.'),
+              ])),
             ),
             if (unlistedStock > 0)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, 0),
-                child: EvSurface(
-                  color: EvColors.bronzeTint,
-                  onTap: () => setState(() {
-                    _picked = true;
-                    _show = _Show.drafts;
-                  }),
-                  child: Row(children: [
-                    const Icon(LucideIcons.lightbulb, size: 18, color: EvColors.bronzeDeep),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text('${plural(unlistedStock, 'stock item')} ${unlistedStock == 1 ? 'isn’t' : 'aren’t'} on the marketplace. Listing them helps vendors find you.',
-                          style: EvType.small.copyWith(color: EvColors.bronzeDeep)),
-                    ),
-                    const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.bronzeDeep),
-                  ]),
+              InkWell(
+                onTap: () => setState(() {
+                  _picked = true;
+                  _show = _Show.drafts;
+                }),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, EvSpace.x1),
+                  child: Text('${plural(unlistedStock, 'stock item')} not listed yet. Listing them helps vendors find you →',
+                      style: EvType.small.copyWith(color: EvColors.bronzeDeep, fontWeight: FontWeight.w600)),
                 ),
               ),
             const SizedBox(height: EvSpace.x3),
@@ -212,11 +193,18 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                 compact: true,
               )
             else
-              for (final l in shown)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, EvSpace.x2),
-                  child: _ListingCard(listing: l, blocker: _blocker(l), onToggle: (v) => _toggle(l, v)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
+                child: EvSurface(
+                  padding: EdgeInsets.zero,
+                  child: Column(children: [
+                    for (final (i, l) in shown.indexed) ...[
+                      if (i > 0) const EvDivider(indent: 100),
+                      _ListingCard(listing: l, blocker: _blocker(l), onToggle: (v) => _toggle(l, v)),
+                    ],
+                  ]),
                 ),
+              ),
           ]);
         },
       ),
@@ -235,70 +223,55 @@ class _ListingCard extends ConsumerWidget {
     final l = listing;
     final live = l.status == ListingStatus.published;
     final missingPhoto = l.photos.isEmpty;
-    return EvSurface(
+    final (statusText, statusColor) = switch (l.status) {
+      ListingStatus.published => ('Live', EvColors.success),
+      ListingStatus.paused => ('Paused', EvColors.warning),
+      ListingStatus.draft => ('Not listed', EvColors.ink3),
+      ListingStatus.archived => ('Archived', EvColors.ink3),
+    };
+    final note = l.moderation != ModerationStatus.ok
+        ? (l.moderation == ModerationStatus.flagged ? 'Flagged by Evenda' : 'Removed by Evenda')
+        : blocker ?? (missingPhoto && l.status != ListingStatus.archived ? 'No photos yet' : null);
+    return InkWell(
       onTap: () => context.push('/business/listings/${l.id}'),
-      padding: const EdgeInsets.all(12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Stack(children: [
-            EvPhoto(l.coverPhoto, width: 76, height: 76, radius: EvRadius.sm, icon: categoryIcon(l.categoryId)),
-            if (live)
-              Positioned(
-                left: 4,
-                top: 4,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: EvColors.success, borderRadius: BorderRadius.circular(EvRadius.pill)),
-                  child: Text('LIVE', style: EvType.overline.copyWith(color: EvColors.inkOnDark, fontSize: 9)),
-                ),
-              ),
-          ]),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(EvSpace.x3, EvSpace.x3, EvSpace.x2, EvSpace.x3),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          EvPhoto(l.coverPhoto, width: 72, height: 72, radius: EvRadius.sm, icon: categoryIcon(l.categoryId)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(l.title, style: EvType.bodyStrong, maxLines: 2, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 2),
-              Text(priceLabel(l), style: EvType.money.copyWith(fontSize: 14)),
-              const SizedBox(height: 4),
+              Text.rich(TextSpan(children: [
+                TextSpan(text: statusText, style: EvType.caption.copyWith(color: statusColor, fontWeight: FontWeight.w700)),
+                TextSpan(text: '  ·  ${priceLabel(l)}', style: EvType.caption.copyWith(color: EvColors.ink)),
+              ])),
+              const SizedBox(height: 2),
               Text(
                 l.isService
                     ? '${l.totalQuantity} job${l.totalQuantity == 1 ? '' : 's'} per day'
                     : l.tracksStock
-                        ? (l.listedQuantity == null
-                            ? 'Offering all ${l.usable} in service · from My stock'
-                            : 'Offering up to ${l.offeredQuantity} of ${l.totalQuantity} · from My stock')
+                        ? (l.listedQuantity == null ? 'Offering all ${l.usable} in service' : 'Offering up to ${l.offeredQuantity} of ${l.totalQuantity}')
                         : categoryById(l.categoryId).name,
                 style: EvType.caption,
               ),
+              if (note != null) ...[
+                const SizedBox(height: 4),
+                Text(note, style: EvType.caption.copyWith(color: l.moderation != ModerationStatus.ok ? EvColors.danger : EvColors.warning, fontWeight: FontWeight.w600)),
+              ],
+              if (l.status == ListingStatus.archived)
+                TextButton(
+                  style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                  onPressed: () => guard(context, () => ref.read(backendProvider).listings.setStatus(l.id, ListingStatus.draft), success: 'Restored. Not listed yet'),
+                  child: const Text('Restore'),
+                ),
             ]),
           ),
           if (l.status != ListingStatus.archived)
-            Column(children: [
-              Switch(value: live, onChanged: onToggle, activeThumbColor: EvColors.inkOnDark, activeTrackColor: EvColors.success),
-              Text(live ? 'Showing' : 'Hidden', style: EvType.caption.copyWith(color: live ? EvColors.success : EvColors.ink3)),
-            ]),
+            Switch(value: live, onChanged: onToggle, activeThumbColor: EvColors.inkOnDark, activeTrackColor: EvColors.success),
         ]),
-        if (blocker != null || (missingPhoto && l.status != ListingStatus.archived) || l.moderation != ModerationStatus.ok) ...[
-          const SizedBox(height: 10),
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            if (l.moderation != ModerationStatus.ok)
-              StatusPill(l.moderation == ModerationStatus.flagged ? 'Flagged by Evenda' : 'Removed by Evenda', tone: Tone.critical, dense: true, icon: LucideIcons.shieldAlert)
-            else if (blocker != null)
-              StatusPill(blocker!, tone: Tone.waiting, dense: true, icon: LucideIcons.circleAlert),
-            if (missingPhoto) const StatusPill('No photos: listings with photos get more requests', tone: Tone.neutral, dense: true, icon: LucideIcons.imageOff),
-          ]),
-        ],
-        if (l.status == ListingStatus.archived) ...[
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () => guard(context, () => ref.read(backendProvider).listings.setStatus(l.id, ListingStatus.draft), success: 'Restored. Not listed yet'),
-              child: const Text('Restore'),
-            ),
-          ),
-        ],
-      ]),
+      ),
     );
   }
 }

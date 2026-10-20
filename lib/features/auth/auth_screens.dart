@@ -188,7 +188,7 @@ class _AuthFrame extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: EvColors.warmWhite,
                       borderRadius: EvRadius.lgAll,
-                      border: Border.all(color: EvColors.sand, width: 1.2),
+                      border: Border.all(color: EvColors.hairline, width: 1.2),
                       boxShadow: EvShadow.raised,
                     ),
                     child: child,

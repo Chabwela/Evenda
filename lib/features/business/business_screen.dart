@@ -43,101 +43,95 @@ class BusinessScreen extends ConsumerWidget {
 
     final stock = listings.where((l) => l.kind == OfferingType.rental && l.tracksStock && l.status != ListingStatus.archived).toList();
     final attention = stock.where((l) => l.inspectionQuantity > 0 || l.damagedQuantity > 0).length;
-    const gold = Color(0xFFC9A27A);
 
+    // Plain grouped list: white surface, hairline dividers, no icon tiles.
     Widget group(List<Widget> rows) => Padding(
           padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
           child: EvSurface(
             padding: EdgeInsets.zero,
             child: Column(children: [
-              for (final (i, r) in rows.indexed) ...[if (i > 0) const EvDivider(indent: 64), r],
+              for (final (i, r) in rows.indexed) ...[if (i > 0) const EvDivider(indent: EvSpace.x4), r],
             ]),
           ),
         );
 
+    final verifiedText = switch (biz.verification) {
+      VerificationStatus.verified => 'Verified',
+      VerificationStatus.pending => 'Verification in review',
+      VerificationStatus.rejected => 'Verification needs new documents',
+      VerificationStatus.unverified => 'Not verified',
+    };
+
     return Scaffold(
       appBar: const TabHeader(title: 'Business'),
       body: ListView(padding: const EdgeInsets.only(bottom: EvSpace.x10), children: [
-        // Who you are on Evenda, and how this month is going.
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
-          child: Material(
-            color: EvColors.forest,
-            borderRadius: EvRadius.lgAll,
-            child: InkWell(
-              onTap: () => context.push('/business/profile'),
-              borderRadius: EvRadius.lgAll,
-              child: Padding(
-                padding: const EdgeInsets.all(EvSpace.x4),
+        // Who you are: compact, on the page.
+        InkWell(
+          onTap: () => context.push('/business/profile'),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, EvSpace.x2),
+            child: Row(children: [
+              BusinessAvatar(name: biz.name, logoUrl: biz.logoUrl, size: 56, verified: biz.verified),
+              const SizedBox(width: EvSpace.x3),
+              Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(biz.name, style: EvType.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text([categoryById(biz.primaryCategory).name, if (biz.neighbourhood != null) biz.neighbourhood!].join(' · '),
+                      style: EvType.small, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
                   Row(children: [
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(color: EvColors.cream, borderRadius: BorderRadius.all(Radius.circular(18))),
-                      child: BusinessAvatar(name: biz.name, logoUrl: biz.logoUrl, size: 56, verified: biz.verified),
-                    ),
-                    const SizedBox(width: EvSpace.x3),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(biz.name, style: EvType.title.copyWith(color: EvColors.inkOnDark), maxLines: 2, overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 2),
-                        Text([categoryById(biz.primaryCategory).name, if (biz.neighbourhood != null) biz.neighbourhood!].join(' · '),
-                            style: EvType.small.copyWith(color: EvColors.sand), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      ]),
-                    ),
-                    const Icon(LucideIcons.chevronRight, color: EvColors.sand),
-                  ]),
-                  const SizedBox(height: EvSpace.x3),
-                  Row(children: [
-                    Icon(biz.verified ? LucideIcons.badgeCheck : LucideIcons.shieldQuestion, size: 16, color: biz.verified ? gold : EvColors.sand),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        switch (biz.verification) {
-                          VerificationStatus.verified => 'Verified business',
-                          VerificationStatus.pending => 'Verification in review',
-                          VerificationStatus.rejected => 'Verification needs new documents',
-                          VerificationStatus.unverified => 'Not verified yet: upload your PACRA or TPIN',
-                        },
-                        style: EvType.smallStrong.copyWith(color: biz.verified ? gold : EvColors.inkOnDark),
-                      ),
-                    ),
-                  ]),
-                  const Padding(padding: EdgeInsets.symmetric(vertical: EvSpace.x3), child: Divider(height: 1, color: EvColors.forestSoft)),
-                  Text('THIS MONTH', style: EvType.overline.copyWith(color: EvColors.sand)),
-                  const SizedBox(height: 6),
-                  Row(children: [
-                    Expanded(child: _HeadStat('Booked', Money.k(value), plural(asSupplier.length, 'booking'), EvColors.inkOnDark)),
-                    Expanded(child: _HeadStat('Paid', Money.k(collected), value == 0 ? '—' : '${(collected / value * 100).round()}% confirmed', gold)),
-                    Expanded(child: _HeadStat('Quotes won', quoted.isEmpty ? '—' : '$won/${quoted.length}', 'all time', EvColors.inkOnDark)),
+                    if (biz.verified) const Padding(padding: EdgeInsets.only(right: 4), child: Icon(LucideIcons.badgeCheck, size: 14, color: EvColors.forest)),
+                    Text(verifiedText, style: EvType.caption.copyWith(color: biz.verified ? EvColors.forest : EvColors.ink3, fontWeight: FontWeight.w600)),
                   ]),
                 ]),
               ),
-            ),
+              const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
+            ]),
           ),
         ),
+        if (!biz.verified && biz.verification != VerificationStatus.pending)
+          InkWell(
+            onTap: () => context.push('/business/profile'),
+            child: Padding(
+            padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x1, EvSpace.gutter, EvSpace.x1),
+            child: Text.rich(
+              TextSpan(style: EvType.small, children: [
+                const TextSpan(text: 'Get the verified badge: '),
+                TextSpan(
+                  text: 'upload your PACRA or TPIN',
+                  style: EvType.small.copyWith(color: EvColors.forest, fontWeight: FontWeight.w600),
+                ),
+              ]),
+            ),
+            ),
+          ),
+
+        const SectionHeader('This month'),
+        EvStatRow(stats: [
+          EvStat('Booked · ${plural(asSupplier.length, 'booking')}', Money.k(value)),
+          EvStat(value == 0 ? 'Paid' : 'Paid · ${(collected / value * 100).round()}%', Money.k(collected), highlight: collected > 0),
+          EvStat('Quotes won', quoted.isEmpty ? '—' : '$won/${quoted.length}'),
+        ]),
 
         const SectionHeader('Stock & marketplace'),
         group([
           if (biz.rents)
             EvRow(
-              leading: const IconTile(LucideIcons.boxes, tone: Tone.positive),
               title: 'My stock',
               subtitle: stock.isEmpty ? 'Count what you own' : '${plural(stock.length, 'item')} · ${stock.fold<int>(0, (s, l) => s + l.totalQuantity)} units',
-              trailing: _Trail(count: attention, tone: Tone.attention, label: 'to check'),
+              trailing: _Trail(note: attention > 0 ? '$attention to check' : null, alert: true),
               onTap: () => context.push('/business/inventory'),
             ),
           EvRow(
-            leading: const IconTile(LucideIcons.store, tone: Tone.positive),
             title: 'On the marketplace',
-            subtitle: '$published live${drafts > 0 ? ' · $drafts not listed' : ''}',
-            trailing: _Trail(count: drafts, tone: Tone.waiting, label: 'to list'),
+            subtitle: '$published live',
+            trailing: _Trail(note: drafts > 0 ? '$drafts not listed' : null),
             onTap: () => context.push('/business/listings'),
           ),
           EvRow(
-            leading: const IconTile(LucideIcons.calendarRange, tone: Tone.positive),
             title: 'Availability & jobs',
-            subtitle: 'Closed dates and jobs booked outside Evenda',
+            subtitle: 'Closed dates, jobs booked outside Evenda',
             trailing: const _Trail(),
             onTap: () => context.push('/business/availability'),
           ),
@@ -145,40 +139,25 @@ class BusinessScreen extends ConsumerWidget {
 
         const SectionHeader('Your business'),
         group([
-          EvRow(leading: const IconTile(LucideIcons.idCard), title: 'Business profile', subtitle: 'Logo, contacts, location, hours, verification',
-              trailing: const _Trail(), onTap: () => context.push('/business/profile')),
-          EvRow(leading: const IconTile(LucideIcons.users), title: 'Team', subtitle: 'Who can quote, book and manage stock', trailing: const _Trail(), onTap: () => context.push('/business/team')),
-          EvRow(
-            leading: const IconTile(LucideIcons.bellRing),
-            title: 'Notifications',
-            subtitle: 'Supplier updates, reminders, quiet hours',
-            trailing: const _Trail(),
-            onTap: () => context.push('/business/notifications'),
-          ),
-        ]),
-
-        const SectionHeader('Account'),
-        group([
-          EvRow(
-            leading: const IconTile(LucideIcons.shieldCheck),
-            title: 'Account & privacy',
-            subtitle: 'Your data, privacy policy, account options',
-            trailing: const _Trail(),
-            onTap: () => context.push('/business/account'),
-          ),
+          EvRow(title: 'Business profile', subtitle: 'Logo, contacts, location, hours', trailing: const _Trail(), onTap: () => context.push('/business/profile')),
+          EvRow(title: 'Team', subtitle: 'Who can quote, book and manage stock', trailing: const _Trail(), onTap: () => context.push('/business/team')),
+          EvRow(title: 'Notifications', subtitle: 'Supplier updates, reminders, quiet hours', trailing: const _Trail(), onTap: () => context.push('/business/notifications')),
+          EvRow(title: 'Account & privacy', subtitle: 'Your data and account options', trailing: const _Trail(), onTap: () => context.push('/business/account')),
         ]),
 
         // Sign out on its own, far from anything destructive.
-        const SizedBox(height: EvSpace.x5),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
-          child: EvButton('Sign out', kind: EvButtonKind.secondary, icon: LucideIcons.logOut, expand: true, onPressed: () async {
-            if (await confirmAction(context, title: 'Sign out?', body: 'You can sign back in any time with your email and password.', confirm: 'Sign out')) {
-              await ref.read(backendProvider).auth.signOut();
-            }
-          }),
+        const SizedBox(height: EvSpace.x8),
+        Center(
+          child: TextButton.icon(
+            onPressed: () async {
+              if (await confirmAction(context, title: 'Sign out?', body: 'You can sign back in any time with your email and password.', confirm: 'Sign out')) {
+                await ref.read(backendProvider).auth.signOut();
+              }
+            },
+            icon: const Icon(LucideIcons.logOut, size: 18),
+            label: const Text('Sign out'),
+          ),
         ),
-        const SizedBox(height: EvSpace.x2),
         if (session != null)
           Center(child: Text('Signed in as ${session.fullName.isEmpty ? 'you' : session.fullName}', style: EvType.caption)),
         const SizedBox(height: EvSpace.x6),
@@ -190,31 +169,18 @@ class BusinessScreen extends ConsumerWidget {
   }
 }
 
-class _HeadStat extends StatelessWidget {
-  const _HeadStat(this.label, this.value, this.sub, this.color);
-  final String label;
-  final String value;
-  final String sub;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(value, style: EvType.number.copyWith(fontSize: 19, color: color))),
-        Text(label, style: EvType.caption.copyWith(color: EvColors.sand)),
-        Text(sub, style: EvType.caption.copyWith(color: EvColors.sand, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
-      ]);
-}
-
-/// Row end: a count pill when something needs doing, otherwise a chevron.
+/// Row end: a short note when something needs doing, then a chevron.
 class _Trail extends StatelessWidget {
-  const _Trail({this.count = 0, this.tone = Tone.neutral, this.label = ''});
-  final int count;
-  final Tone tone;
-  final String label;
+  const _Trail({this.note, this.alert = false});
+  final String? note;
+  final bool alert;
 
   @override
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-        if (count > 0) ...[StatusPill('$count $label', tone: tone, dense: true), const SizedBox(width: 4)],
+        if (note != null) ...[
+          Text(note!, style: EvType.caption.copyWith(color: alert ? EvColors.warning : EvColors.ink2, fontWeight: FontWeight.w600)),
+          const SizedBox(width: 4),
+        ],
         const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
       ]);
 }

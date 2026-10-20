@@ -103,16 +103,16 @@ class _AdminConsoleScreenState extends ConsumerState<AdminConsoleScreen> {
       return Scaffold(
         body: Row(children: [
           NavigationRail(
-            backgroundColor: EvColors.forest,
+            backgroundColor: EvColors.warmWhite,
             extended: MediaQuery.sizeOf(context).width >= EvBreakpoints.desktop,
             selectedIndex: sections.indexOf(_s),
             onDestinationSelected: (i) => setState(() => _s = sections[i]),
-            indicatorColor: EvColors.forestSoft,
-            leading: const Padding(padding: EdgeInsets.symmetric(vertical: EvSpace.x5), child: EvendaMark(size: 34, onDark: true)),
-            selectedIconTheme: const IconThemeData(color: EvColors.inkOnDark),
-            unselectedIconTheme: const IconThemeData(color: EvColors.sand),
-            selectedLabelTextStyle: EvType.smallStrong.copyWith(color: EvColors.inkOnDark),
-            unselectedLabelTextStyle: EvType.small.copyWith(color: EvColors.sand),
+            indicatorColor: EvColors.forestTint,
+            leading: const Padding(padding: EdgeInsets.symmetric(vertical: EvSpace.x5), child: EvendaMark(size: 34)),
+            selectedIconTheme: const IconThemeData(color: EvColors.forest),
+            unselectedIconTheme: const IconThemeData(color: EvColors.ink3),
+            selectedLabelTextStyle: EvType.smallStrong.copyWith(color: EvColors.forest),
+            unselectedLabelTextStyle: EvType.small.copyWith(color: EvColors.ink2),
             destinations: [for (final s in sections) NavigationRailDestination(icon: Icon(s.icon), label: Text(s.label))],
           ),
           Expanded(child: Scaffold(appBar: header, body: content)),
@@ -190,34 +190,24 @@ class _Overview extends ConsumerWidget {
         final waiting = queue.where((q) => q.count > 0).length;
 
         return ListView(padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, EvSpace.x10), children: [
-          // Header: the platform at a glance.
-          Container(
-            padding: const EdgeInsets.all(EvSpace.x4),
-            decoration: BoxDecoration(color: EvColors.forest, borderRadius: EvRadius.lgAll),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                const EvendaMark(size: 22, onDark: true),
-                const SizedBox(width: 8),
-                Expanded(child: Text(EvDates.dayLong(EvDates.today()).toUpperCase(), style: EvType.overline.copyWith(color: EvColors.sand))),
-              ]),
-              const SizedBox(height: EvSpace.x3),
-              Text(greeting, style: EvType.display.copyWith(color: EvColors.inkOnDark)),
-              const SizedBox(height: 2),
-              Text(
-                '${waiting == 0 ? 'Nothing is waiting on you' : '$waiting thing${waiting == 1 ? '' : 's'} need${waiting == 1 ? 's' : ''} your decision'}'
-                ' · ${plural(n('open_quote_requests'), 'open quote request')}',
-                style: EvType.small.copyWith(color: waiting == 0 ? EvColors.sand : const Color(0xFFC9A27A)),
-              ),
-              const SizedBox(height: EvSpace.x4),
-              Row(children: [
-                Expanded(child: _HeaderStat('Businesses', n('businesses'), onTap: role.can(_Section.businesses.permission) ? () => onOpen(_Section.businesses) : null)),
-                Expanded(child: _HeaderStat('Listings', n('published_listings'), onTap: role.can(_Section.listings.permission) ? () => onOpen(_Section.listings) : null)),
-                Expanded(child: _HeaderStat('Bookings · 30 d', n('bookings_30d'), onTap: role.can(_Section.bookings.permission) ? () => onOpen(_Section.bookings) : null)),
-              ]),
-            ]),
+          // Header: date, greeting, the platform at a glance. Light, on the page.
+          Text(EvDates.dayLong(EvDates.today()), style: EvType.caption),
+          const SizedBox(height: 2),
+          Text(greeting, style: EvType.display),
+          const SizedBox(height: 4),
+          Text(
+            '${waiting == 0 ? 'Nothing is waiting on you' : '$waiting thing${waiting == 1 ? '' : 's'} need${waiting == 1 ? 's' : ''} your decision'}'
+            ' · ${plural(n('open_quote_requests'), 'open quote request')}',
+            style: EvType.small.copyWith(color: waiting == 0 ? EvColors.ink2 : EvColors.bronzeDeep, fontWeight: waiting == 0 ? null : FontWeight.w600),
           ),
+          const SizedBox(height: EvSpace.x5),
+          EvStatRow(padding: EdgeInsets.zero, stats: [
+            EvStat('Businesses', '${n('businesses')}', onTap: role.can(_Section.businesses.permission) ? () => onOpen(_Section.businesses) : null),
+            EvStat('Listings', '${n('published_listings')}', onTap: role.can(_Section.listings.permission) ? () => onOpen(_Section.listings) : null),
+            EvStat('Bookings · 30 d', '${n('bookings_30d')}', onTap: role.can(_Section.bookings.permission) ? () => onOpen(_Section.bookings) : null),
+          ]),
 
-          const SectionHeader('Needs your decision', padding: EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
+          const SectionHeader('Needs your decision', padding: EdgeInsets.fromLTRB(0, EvSpace.x8, 0, EvSpace.x2)),
           EvSurface(
             padding: EdgeInsets.zero,
             child: Column(children: [
@@ -258,12 +248,7 @@ class _QueueRow extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: EvSpace.x4, vertical: 12),
         child: Row(children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(color: active ? q.tone.bg : EvColors.neutralTint, borderRadius: EvRadius.smAll),
-            child: Icon(q.icon, size: 18, color: active ? q.tone.fg : EvColors.ink3),
-          ),
+          Icon(q.icon, size: 20, color: active ? q.tone.fg : EvColors.ink3),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -285,26 +270,6 @@ class _QueueRow extends StatelessWidget {
       ),
     );
   }
-}
-
-class _HeaderStat extends StatelessWidget {
-  const _HeaderStat(this.label, this.value, {this.onTap});
-  final String label;
-  final int value;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        borderRadius: EvRadius.smAll,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            EvAnimatedCount(value: value, style: EvType.number.copyWith(color: EvColors.inkOnDark)),
-            Text(label, style: EvType.caption.copyWith(color: EvColors.sand), maxLines: 1, overflow: TextOverflow.ellipsis),
-          ]),
-        ),
-      );
 }
 
 class _Businesses extends ConsumerStatefulWidget {
@@ -490,41 +455,29 @@ class _NowMonitorState extends ConsumerState<_NowMonitor> {
           final list = all.where(filter.matches).toList();
 
           return ListView(padding: const EdgeInsets.only(bottom: EvSpace.x10), children: [
-            Container(
-              margin: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, 0),
-              padding: const EdgeInsets.all(EvSpace.x4),
-              decoration: BoxDecoration(color: EvColors.forest, borderRadius: EvRadius.lgAll),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  _LiveDot(active: live > 0),
-                  const SizedBox(width: 8),
-                  Text(live > 0 ? 'LIVE NOW' : 'NOTHING URGENT RIGHT NOW', style: EvType.overline.copyWith(color: live > 0 ? const Color(0xFFC9A27A) : EvColors.sand)),
-                ]),
-                const SizedBox(height: 6),
-                Text('$live open request${live == 1 ? '' : 's'}', style: EvType.display.copyWith(color: EvColors.inkOnDark)),
-                Text('${all.length} in the last 100 · ${plural(alerted, 'supplier alert')}', style: EvType.caption.copyWith(color: EvColors.sand)),
-                const SizedBox(height: EvSpace.x4),
-                Row(children: [
-                  Expanded(child: _MoneyFact('Reached a supplier', pct(reached, sent.length), EvColors.inkOnDark)),
-                  Expanded(child: _MoneyFact('Ended in a booking', pct(matched, sent.length), const Color(0xFFC9A27A))),
-                ]),
-                if (sent.isNotEmpty && reached < sent.length) ...[
-                  const SizedBox(height: EvSpace.x3),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: EvColors.forestSoft, borderRadius: EvRadius.mdAll),
-                    child: Row(children: [
-                      const Icon(LucideIcons.radar, size: 18, color: Color(0xFFC9A27A)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text('${sent.length - reached} request${sent.length - reached == 1 ? '' : 's'} found no supplier in range. Recruit vendors in those categories and areas.',
-                            style: EvType.small.copyWith(color: EvColors.inkOnDark)),
-                      ),
-                    ]),
-                  ),
-                ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, EvSpace.x4),
+              child: Row(children: [
+                _LiveDot(active: live > 0),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text.rich(TextSpan(style: EvType.body.copyWith(color: EvColors.ink2), children: [
+                    TextSpan(text: live > 0 ? '$live open now' : 'Nothing urgent right now', style: EvType.bodyStrong.copyWith(color: live > 0 ? EvColors.bronzeDeep : EvColors.ink)),
+                    TextSpan(text: ' · ${all.length} recent · ${plural(alerted, 'supplier alert')}'),
+                  ])),
+                ),
               ]),
             ),
+            EvStatRow(stats: [
+              EvStat('Reached a supplier', pct(reached, sent.length), alert: sent.isNotEmpty && reached < sent.length),
+              EvStat('Ended in a booking', pct(matched, sent.length), highlight: matched > 0),
+            ]),
+            if (sent.isNotEmpty && reached < sent.length)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, 0),
+                child: Text('${sent.length - reached} request${sent.length - reached == 1 ? '' : 's'} found no supplier in range. Recruit vendors in those categories and areas.',
+                    style: EvType.small.copyWith(color: EvColors.warning)),
+              ),
             const SizedBox(height: EvSpace.x3),
             EvSegmented<_NowFilter>(
               value: filter,
@@ -931,61 +884,45 @@ class _BookingsState extends ConsumerState<_Bookings> {
           final list = all.where(_filter.matches).toList();
 
           return ListView(padding: const EdgeInsets.only(bottom: EvSpace.x10), children: [
-            // Money overview, the platform's ledger at a glance.
-            Container(
-              margin: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, 0),
-              padding: const EdgeInsets.all(EvSpace.x4),
-              decoration: BoxDecoration(color: EvColors.forest, borderRadius: EvRadius.lgAll),
+            // The platform's ledger: typography on the page, not a coloured block.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, EvSpace.x4),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('BOOKED VALUE ON EVENDA', style: EvType.overline.copyWith(color: EvColors.sand)),
-                const SizedBox(height: 4),
-                Text(Money.zmw(value), style: EvType.display.copyWith(color: EvColors.inkOnDark)),
-                Text('${live.length} live booking${live.length == 1 ? '' : 's'} · cancelled excluded', style: EvType.caption.copyWith(color: EvColors.sand)),
+                Text('Booked value on Evenda', style: EvType.small),
+                Text(Money.zmw(value), style: EvType.display),
+                Text('${live.length} live booking${live.length == 1 ? '' : 's'} · cancelled excluded', style: EvType.caption),
                 if (widget.showPayments) ...[
                   const SizedBox(height: EvSpace.x3),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: value == 0 ? 0 : paid / value,
-                      minHeight: 8,
-                      backgroundColor: EvColors.forestSoft,
-                      color: const Color(0xFFC9A27A),
-                    ),
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(value: value == 0 ? 0 : paid / value, minHeight: 6, backgroundColor: EvColors.sand, color: EvColors.success),
                   ),
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    Expanded(child: _MoneyFact('Confirmed paid', Money.k(paid), const Color(0xFFC9A27A))),
-                    Expanded(child: _MoneyFact('Still owed', Money.k(owed), EvColors.inkOnDark)),
-                  ]),
-                  if (overpaid.isNotEmpty) ...[
-                    const SizedBox(height: EvSpace.x3),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(color: EvColors.dangerTint, borderRadius: EvRadius.mdAll),
-                      child: Row(children: [
-                        const Icon(LucideIcons.triangleAlert, size: 18, color: EvColors.danger),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '${overpaid.length} booking${overpaid.length == 1 ? ' has' : 's have'} more confirmed than the booking total (${overpaid.map((b) => b.reference).join(', ')}). Check for a typing error.',
-                            style: EvType.small.copyWith(color: EvColors.danger),
-                          ),
-                        ),
-                      ]),
-                    ),
-                  ],
                 ],
               ]),
             ),
-            const SizedBox(height: EvSpace.x3),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
-              child: Row(children: [
-                Expanded(child: _MiniStat('Disputed', '$disputed', tone: disputed > 0 ? Tone.critical : Tone.neutral)),
-                const SizedBox(width: 8),
-                Expanded(child: _MiniStat('Unconfirmed payments', '$unconfirmed', tone: unconfirmed > 0 ? Tone.waiting : Tone.neutral)),
+            if (widget.showPayments)
+              EvStatRow(stats: [
+                EvStat('Confirmed paid', Money.k(paid), highlight: paid > 0),
+                EvStat('Still owed', Money.k(owed), alert: owed > 0),
+                EvStat('Disputed', '$disputed', alert: disputed > 0),
+                EvStat('Unconfirmed', '$unconfirmed'),
               ]),
-            ),
+            if (overpaid.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, 0),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(LucideIcons.triangleAlert, size: 16, color: EvColors.danger),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '${overpaid.map((b) => b.reference).join(', ')}: more confirmed than the booking total. Check for a typing error.',
+                      style: EvType.small.copyWith(color: EvColors.danger),
+                    ),
+                  ),
+                ]),
+              ),
+            if (!widget.showPayments)
+              EvStatRow(stats: [EvStat('Disputed', '$disputed', alert: disputed > 0)]),
             const SizedBox(height: EvSpace.x3),
             EvSegmented<_BookingFilter>(
               value: _filter,
@@ -1004,19 +941,6 @@ class _BookingsState extends ConsumerState<_Bookings> {
           ]);
         },
       );
-}
-
-class _MoneyFact extends StatelessWidget {
-  const _MoneyFact(this.label, this.value, this.color);
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: EvType.caption.copyWith(color: EvColors.sand)),
-        Text(value, style: EvType.money.copyWith(color: color, fontSize: 17)),
-      ]);
 }
 
 class _AdminBookingCard extends StatelessWidget {

@@ -27,8 +27,8 @@ void main() {
     }
 
     expect(find.textContaining('permanently deletes'), findsOneWidget);
-    expect(find.text('DELETED'), findsOneWidget); // section headers render in capitals
-    expect(find.text('KEPT, WITHOUT YOUR NAME'), findsOneWidget);
+    expect(find.text('Deleted'), findsOneWidget); // section headers are sentence case
+    expect(find.text('Kept, without your name'), findsOneWidget);
 
     final button = find.widgetWithText(EvButton, 'Delete my account permanently');
     await t.ensureVisible(button);

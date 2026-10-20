@@ -78,7 +78,7 @@ class _OfflineStateState extends ConsumerState<OfflineState> with SingleTickerPr
                   child: Container(
                     width: art * 0.46,
                     height: art * 0.46,
-                    decoration: BoxDecoration(color: EvColors.warmWhite, shape: BoxShape.circle, border: Border.all(color: EvColors.sand, width: 1.5), boxShadow: EvShadow.raised),
+                    decoration: BoxDecoration(color: EvColors.warmWhite, shape: BoxShape.circle, border: Border.all(color: EvColors.hairline, width: 1.5), boxShadow: EvShadow.raised),
                     child: Center(child: EvendaMark(size: art * 0.3)),
                   ),
                 ),
