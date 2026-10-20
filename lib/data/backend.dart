@@ -165,6 +165,10 @@ abstract class BookingApi {
   Future<void> recordPayment(String bookingId, String businessId,
       {required double amount, required String method, required String kind, String? reference, String? note});
   Future<void> confirmPayment(String paymentId);
+
+  /// Void a payment record your business entered and the other side hasn't
+  /// confirmed yet (typos). Kept in history; never counts.
+  Future<void> voidPayment(String paymentId, String reason);
   Future<void> openDispute(String bookingId, String businessId, String reason);
 }
 
@@ -257,6 +261,9 @@ abstract class AdminApi {
 
   /// Cancel a booking as Evenda (reason required, audited, both parties told).
   Future<void> cancelBooking(String bookingId, String reason);
+
+  /// Void any payment record (finance / super admin), with a reason; audited.
+  Future<void> voidPayment(String paymentId, String reason);
   Future<List<Dispute>> disputes();
   Future<void> resolveDispute(String disputeId, String status, String resolution);
   Future<List<AuditEntry>> auditLog();

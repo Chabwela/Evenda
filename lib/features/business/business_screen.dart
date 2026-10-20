@@ -32,12 +32,9 @@ class BusinessScreen extends ConsumerWidget {
     final published = listings.where((l) => l.status == ListingStatus.published).length;
     final drafts = listings.where((l) => l.status == ListingStatus.draft).length;
 
-    // This month's report (supplier side).
-    final now = DateTime.now();
-    final monthStart = DateTime(now.year, now.month);
-    final asSupplier = (hub?.$2 ?? const <Booking>[]).where((b) => b.supplier.id == biz.id && !b.createdAt.isBefore(monthStart) && b.status != BookingStatus.cancelled).toList();
-    final value = asSupplier.fold(0.0, (s, b) => s + b.total);
-    final collected = asSupplier.fold(0.0, (s, b) => s + b.confirmedPaid);
+    // This month as a supplier (rules in SupplierMonth: Lusaka month, confirmed
+    // non-voided payments, each booking counted at most to its own total).
+    final month = SupplierMonth.of(hub?.$2 ?? const <Booking>[], biz.id);
     final quoted = (hub?.$3 ?? const <QuoteRequest>[]).where((q) => q.supplier.id == biz.id && q.quotations.isNotEmpty).toList();
     final won = quoted.where((q) => q.status == QuoteRequestStatus.accepted).length;
 
@@ -109,10 +106,26 @@ class BusinessScreen extends ConsumerWidget {
 
         const SectionHeader('This month'),
         EvStatRow(stats: [
-          EvStat('Booked · ${plural(asSupplier.length, 'booking')}', Money.k(value)),
-          EvStat(value == 0 ? 'Paid' : 'Paid · ${(collected / value * 100).round()}%', Money.k(collected), highlight: collected > 0),
+          EvStat('Booked · ${plural(month.bookings.length, 'booking')}', Money.k(month.booked)),
+          EvStat(month.collectedPercent == null ? 'Paid' : 'Paid · ${month.collectedPercent}%', Money.k(month.paid), highlight: month.paid > 0),
           EvStat('Quotes won', quoted.isEmpty ? '—' : '$won/${quoted.length}'),
         ]),
+        // Never hide an inconsistency inside a capped figure: name it.
+        for (final b in month.overpaid)
+          InkWell(
+            onTap: () => context.push('/bookings/${b.id}'),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, 0),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(LucideIcons.triangleAlert, size: 16, color: EvColors.danger),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text('${b.reference}: ${Money.k(b.confirmedPaid)} confirmed against a ${Money.k(b.total)} booking. Check the payment record →',
+                      style: EvType.small.copyWith(color: EvColors.danger)),
+                ),
+              ]),
+            ),
+          ),
 
         const SectionHeader('Stock & marketplace'),
         group([

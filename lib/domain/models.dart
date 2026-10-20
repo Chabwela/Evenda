@@ -1050,6 +1050,8 @@ class PaymentRecord {
     this.reference,
     this.confirmedAt,
     this.note,
+    this.voidedAt,
+    this.voidReason,
   });
   final String id;
   final double amount;
@@ -1060,6 +1062,19 @@ class PaymentRecord {
   final String? reference;
   final DateTime? confirmedAt;
   final String? note;
+
+  /// Voided records stay in the history but never count (see migration
+  /// 20261020000600_payment_integrity).
+  final DateTime? voidedAt;
+  final String? voidReason;
+
+  bool get voided => voidedAt != null;
+
+  /// Counts towards what has been paid: confirmed by the other business and not voided.
+  bool get counts => confirmedAt != null && voidedAt == null;
+
+  /// Signed amount: refunds subtract.
+  double get signed => kind == 'refund' ? -amount : amount;
 
   String get methodLabel => switch (method) {
         'mobile_money' => 'Mobile money',
@@ -1077,6 +1092,8 @@ class PaymentRecord {
         createdAt: _dt(r['created_at'])!,
         reference: r['reference'],
         confirmedAt: _dt(r['confirmed_by_counterparty_at']),
+        voidedAt: _dt(r['voided_at']),
+        voidReason: r['void_reason'],
         note: r['note'],
       );
 }
@@ -1130,9 +1147,19 @@ class Booking {
 
   bool isSupplier(String businessId) => supplier.id == businessId;
   BizRef counterparty(String businessId) => isSupplier(businessId) ? requester : supplier;
-  double get confirmedPaid => payments
-      .where((p) => p.confirmedAt != null)
-      .fold(0.0, (s, p) => s + (p.kind == 'refund' ? -p.amount : p.amount));
+  /// Confirmed by the other business, not voided, refunds subtracted.
+  double get confirmedPaid => payments.where((p) => p.counts).fold(0.0, (s, p) => s + p.signed);
+
+  /// Everything not voided, including records still awaiting confirmation:
+  /// what the server checks a new payment against.
+  double get recordedNet => payments.where((p) => !p.voided).fold(0.0, (s, p) => s + p.signed);
+
+  /// Still due before a new payment would exceed the total.
+  double get remainingToRecord => (total - recordedNet).clamp(0, double.infinity).toDouble();
+
+  /// More confirmed than the booking total: a data problem to reconcile, never
+  /// something to hide in a percentage.
+  bool get overpaid => confirmedPaid > total + 0.005;
 
   static const columns = '*, requester:businesses!bookings_requester_business_id_fkey(id, name, logo_path, neighbourhood, verification_status, whatsapp, phone), '
       'supplier:businesses!bookings_supplier_business_id_fkey(id, name, logo_path, neighbourhood, verification_status, whatsapp, phone), '
@@ -1991,4 +2018,39 @@ class AdminNowRecipient {
   final DateTime notifiedAt;
   final DateTime? seenAt;
   final DateTime? declinedAt;
+}
+
+/// A business's month as a supplier, computed from authoritative booking and
+/// payment records (Business dashboard).
+///
+/// * Month basis: bookings created in the current calendar month in Lusaka
+///   time (CAT, UTC+2), cancelled bookings excluded.
+/// * Paid: confirmed, non-voided payments, refunds subtracted, and counted at
+///   most up to each booking's own total, so an overpayment on one booking can
+///   never inflate the month or hide money owed on another. Overpaid bookings
+///   are listed separately for reconciliation.
+/// * Collection % = paid / booked, so it can't exceed 100%.
+class SupplierMonth {
+  SupplierMonth._(this.bookings, this.booked, this.paid, this.overpaid);
+
+  factory SupplierMonth.of(List<Booking> all, String businessId, {DateTime? now}) {
+    final lusakaNow = (now ?? DateTime.now()).toUtc().add(const Duration(hours: 2));
+    bool thisMonth(DateTime t) {
+      final l = t.toUtc().add(const Duration(hours: 2));
+      return l.year == lusakaNow.year && l.month == lusakaNow.month;
+    }
+
+    final mine = all.where((b) => b.supplier.id == businessId && b.status != BookingStatus.cancelled && thisMonth(b.createdAt)).toList();
+    final booked = mine.fold<double>(0, (s, b) => s + b.total);
+    final paid = mine.fold<double>(0, (s, b) => s + b.confirmedPaid.clamp(0, b.total));
+    return SupplierMonth._(mine, booked, paid, mine.where((b) => b.overpaid).toList());
+  }
+
+  final List<Booking> bookings;
+  final double booked;
+  final double paid;
+  final List<Booking> overpaid;
+
+  double get outstanding => (booked - paid).clamp(0, double.infinity).toDouble();
+  int? get collectedPercent => booked == 0 ? null : (paid / booked * 100).round();
 }

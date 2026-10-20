@@ -69,7 +69,14 @@ class _BodyState extends ConsumerState<_Body> {
       subtitle: 'The other business confirms it before it counts. Evenda does not move money.',
       builder: (c) => StatefulBuilder(
         builder: (c, set) => ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, EvSpace.x6), children: [
-          EvField(label: 'Amount', controller: amount, prefixText: 'K ', keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]),
+          Text(
+            kind == 'refund'
+                ? 'Up to ${Money.k(b.confirmedPaid.clamp(0, double.infinity))} can be refunded (confirmed as paid).'
+                : '${Money.k(b.remainingToRecord)} still due of ${Money.k(b.total)}${b.recordedNet > b.confirmedPaid ? ' (some records await confirmation)' : ''}.',
+            style: EvType.small,
+          ),
+          const SizedBox(height: EvSpace.x3),
+          EvField(label: 'Amount', controller: amount, prefixText: 'K ', keyboardType: const TextInputType.numberWithOptions(decimal: true), inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]),
           const SizedBox(height: EvSpace.x4),
           const EvFieldLabel('Type'),
           Wrap(spacing: 8, children: [
@@ -85,7 +92,20 @@ class _BodyState extends ConsumerState<_Body> {
           const SizedBox(height: EvSpace.x4),
           EvField(label: 'Reference', controller: ref0, hint: 'e.g. Airtel Money transaction ID', optional: true),
           const SizedBox(height: EvSpace.x5),
-          EvButton('Save record', expand: true, onPressed: () => Navigator.pop(c, true)),
+          EvButton('Save record', expand: true, onPressed: () {
+            // Mirrors the server rules for a clear message before sending;
+            // the server stays the authority (record_payment).
+            final v = double.tryParse(amount.text);
+            final limit = kind == 'refund' ? b.confirmedPaid : b.remainingToRecord;
+            if (v == null || v <= 0 || (v * 100).roundToDouble() != v * 100) {
+              showToast(c, 'Enter an amount above zero with at most two decimals.', icon: LucideIcons.circleAlert);
+            } else if (v > limit + 0.001) {
+              showToast(c, kind == 'refund' ? 'A refund can’t be more than ${Money.k(limit)}.' : 'Only ${Money.k(limit)} is still due on this booking.',
+                  icon: LucideIcons.circleAlert);
+            } else {
+              Navigator.pop(c, true);
+            }
+          }),
         ]),
       ),
     );
@@ -202,10 +222,26 @@ class _BodyState extends ConsumerState<_Body> {
               const EvDivider(indent: EvSpace.x4),
               EvRow(
                 padding: const EdgeInsets.symmetric(horizontal: EvSpace.x4, vertical: 10),
-                leading: IconTile(p.kind == 'refund' ? LucideIcons.undo2 : LucideIcons.handCoins, tone: p.confirmedAt != null ? Tone.positive : Tone.waiting, size: 32),
-                title: '${Money.k(p.amount)} ${p.kind}',
-                subtitle: '${p.methodLabel}${p.reference != null ? ' · ${p.reference}' : ''} · ${p.recordedByBusinessId == me ? 'you recorded' : 'they recorded'} ${EvDates.ago(p.createdAt)}',
-                trailing: p.confirmedAt != null
+                leading: IconTile(p.kind == 'refund' ? LucideIcons.undo2 : LucideIcons.handCoins, tone: p.voided ? Tone.neutral : (p.confirmedAt != null ? Tone.positive : Tone.waiting), size: 32),
+                title: '${Money.k(p.amount)} ${p.kind}${p.voided ? ' · voided' : ''}',
+                titleStyle: p.voided ? EvType.bodyStrong.copyWith(color: EvColors.ink3, decoration: TextDecoration.lineThrough) : null,
+                subtitle: p.voided
+                    ? 'Voided: ${p.voidReason ?? ''}'
+                    : '${p.methodLabel}${p.reference != null ? ' · ${p.reference}' : ''} · ${p.recordedByBusinessId == me ? 'you recorded' : 'they recorded'} ${EvDates.ago(p.createdAt)}',
+                trailing: p.voided
+                    ? null
+                    : p.confirmedAt == null && p.recordedByBusinessId == me
+                        ? TextButton(
+                            onPressed: () async {
+                              final reason = await confirmWithReason(context,
+                                  title: 'Void this record?', body: 'Use this for a typing mistake. It stays in the history but no longer counts.', confirm: 'Void');
+                              if (reason != null && context.mounted) {
+                                await guard(context, () => ref.read(backendProvider).bookings.voidPayment(p.id, reason), success: 'Record voided');
+                              }
+                            },
+                            child: const Text('Void'),
+                          )
+                        : p.confirmedAt != null
                     ? const Icon(LucideIcons.circleCheck, size: 18, color: EvColors.success)
                     : p.recordedByBusinessId != me
                         ? EvButton('Confirm', compact: true, kind: EvButtonKind.secondary,

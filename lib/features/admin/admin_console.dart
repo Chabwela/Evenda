@@ -880,7 +880,7 @@ class _BookingsState extends ConsumerState<_Bookings> {
           final owed = live.fold<double>(0, (s, b) => s + (b.total - b.confirmedPaid).clamp(0, double.infinity));
           final overpaid = live.where((b) => b.confirmedPaid > b.total + 0.005).toList();
           final disputed = all.where((b) => b.status == BookingStatus.disputed).length;
-          final unconfirmed = all.expand((b) => b.payments).where((p) => p.confirmedAt == null).length;
+          final unconfirmed = all.expand((b) => b.payments).where((p) => p.confirmedAt == null && !p.voided).length;
           final list = all.where(_filter.matches).toList();
 
           return ListView(padding: const EdgeInsets.only(bottom: EvSpace.x10), children: [
@@ -1126,20 +1126,47 @@ class _BookingFile extends ConsumerWidget {
               child: EvSurface(
                 padding: const EdgeInsets.all(12),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Icon(p.kind == 'refund' ? LucideIcons.undo2 : LucideIcons.banknote, size: 20, color: p.confirmedAt != null ? EvColors.success : EvColors.warning),
+                  Icon(p.kind == 'refund' ? LucideIcons.undo2 : LucideIcons.banknote, size: 20,
+                      color: p.voided ? EvColors.ink3 : (p.confirmedAt != null ? EvColors.success : EvColors.warning)),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('${p.kind[0].toUpperCase()}${p.kind.substring(1)} · ${p.methodLabel}', style: EvType.smallStrong),
+                      Text('${p.kind[0].toUpperCase()}${p.kind.substring(1)} · ${p.methodLabel}${p.voided ? ' · voided' : ''}',
+                          style: EvType.smallStrong.copyWith(decoration: p.voided ? TextDecoration.lineThrough : null)),
                       Text('Recorded by ${who(p.recordedByBusinessId)} · ${EvDates.dayTime(p.createdAt)}', style: EvType.caption),
                       if (p.reference != null) Text('Ref ${p.reference}', style: EvType.caption.copyWith(fontFamily: 'monospace')),
                       const SizedBox(height: 4),
-                      p.confirmedAt != null
-                          ? StatusPill('Confirmed by the other party', tone: Tone.positive, dense: true, icon: LucideIcons.check)
-                          : const StatusPill('Not confirmed', tone: Tone.waiting, dense: true),
+                      if (p.voided)
+                        Text('Voided: ${p.voidReason ?? ''}', style: EvType.caption.copyWith(color: EvColors.ink2))
+                      else
+                        p.confirmedAt != null
+                            ? StatusPill('Confirmed by the other party', tone: Tone.positive, dense: true, icon: LucideIcons.check)
+                            : const StatusPill('Not confirmed', tone: Tone.waiting, dense: true),
+                      if (!p.voided && (role?.can('payment.read') ?? false))
+                        TextButton(
+                          style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                          onPressed: () async {
+                            final reason = await confirmWithReason(context,
+                                title: 'Void ${Money.k(p.amount)} on ${b.reference}?',
+                                body: 'The record stays in the history but stops counting. Both businesses are told your reason; it is audited.',
+                                confirm: 'Void record',
+                                destructive: true);
+                            if (reason == null || !context.mounted) return;
+                            final ok = await guard(context, () async {
+                              await ref.read(backendProvider).admin.voidPayment(p.id, reason);
+                              return true;
+                            }, success: 'Payment record voided');
+                            if (ok == true && context.mounted) {
+                              onChanged();
+                              Navigator.pop(context);
+                            }
+                          },
+                          child: Text('Void record', style: EvType.caption.copyWith(color: EvColors.danger, fontWeight: FontWeight.w600)),
+                        ),
                     ]),
                   ),
-                  Text('${p.kind == 'refund' ? '−' : ''}${Money.k(p.amount)}', style: EvType.money),
+                  Text('${p.kind == 'refund' ? '−' : ''}${Money.k(p.amount)}',
+                      style: EvType.money.copyWith(color: p.voided ? EvColors.ink3 : null, decoration: p.voided ? TextDecoration.lineThrough : null)),
                 ]),
               ),
             ),

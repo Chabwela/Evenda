@@ -167,6 +167,15 @@ class SupabaseBackend implements Backend {
     } catch (_) {}
     final code = e.message.trim();
     if (RegExp(r'^[a-z_]+$').hasMatch(code)) {
+      if (code == 'payment_exceeds_balance' && detail?['remaining'] != null) {
+        final rem = (detail!['remaining'] as num).toDouble();
+        return EvError(code, rem <= 0
+            ? 'This booking is already fully recorded. Ask the other business to confirm, or void a wrong record first.'
+            : 'Only ${Money.k(rem)} is still due on this booking (including records awaiting confirmation).', detail);
+      }
+      if (code == 'refund_exceeds_paid' && detail?['confirmed'] != null) {
+        return EvError(code, 'A refund can’t be more than the ${Money.k((detail!['confirmed'] as num).toDouble())} confirmed as paid.', detail);
+      }
       if (code == 'insufficient_availability' && detail?['available'] != null) {
         return EvError(code, 'Only ${detail!['available']} available for those dates.', detail);
       }
@@ -918,6 +927,12 @@ class _SbBookings implements BookingApi {
   }
 
   @override
+  Future<void> voidPayment(String paymentId, String reason) async {
+    await b.rpc('void_payment', {'p_payment': paymentId, 'p_reason': reason});
+    b.touch({DataDomain.bookings});
+  }
+
+  @override
   Future<void> openDispute(String bookingId, String businessId, String reason) async {
     await b.rpc('open_dispute', {'p_booking': bookingId, 'p_business': businessId, 'p_reason': reason});
     b.touch({DataDomain.bookings});
@@ -1321,6 +1336,12 @@ class _SbAdmin implements AdminApi {
   Future<void> reviewDocument(String documentId, String status, String note) async {
     await b.rpc('admin_review_document', {'p_document': documentId, 'p_status': status, 'p_note': note});
     b.touch({DataDomain.admin});
+  }
+
+  @override
+  Future<void> voidPayment(String paymentId, String reason) async {
+    await b.rpc('admin_void_payment', {'p_payment': paymentId, 'p_reason': reason});
+    b.touch({DataDomain.admin, DataDomain.bookings});
   }
 
   @override

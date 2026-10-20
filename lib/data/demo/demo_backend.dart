@@ -1070,6 +1070,9 @@ class _DemoBookings implements BookingApi {
   }
 
   @override
+  Future<void> voidPayment(String paymentId, String reason) async => throw const EvError('not_found', 'Needs the live backend.');
+
+  @override
   Future<void> confirmPayment(String paymentId) async {
     final x = db.bookings.values.firstWhere((bk) => bk.payments.any((p) => p.id == paymentId));
     final p = x.payments.firstWhere((p) => p.id == paymentId);
@@ -1757,6 +1760,9 @@ class _DemoAdmin implements AdminApi {
 
   @override
   Future<Map<String, ({int listings, int businesses})>> categoryUsage() async => const {};
+
+  @override
+  Future<void> voidPayment(String paymentId, String reason) async => throw const EvError('not_found', 'Needs the live backend.');
 
   @override
   Future<void> cancelBooking(String bookingId, String reason) async => throw const EvError('not_found', 'Needs the live backend.');
