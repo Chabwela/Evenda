@@ -8,6 +8,7 @@ import '../../core/format.dart';
 import '../../data/backend.dart';
 import '../../design/ev.dart';
 import '../../domain/models.dart';
+import '../shared/feed_cards.dart' show priceLabel;
 
 final _inventoryProvider = FutureProvider.autoDispose<(List<Listing>, List<Reservation>, List<InventoryConflict>)>((ref) async {
   ref.watchDomains(const [DataDomain.listings, DataDomain.bookings]);
@@ -21,35 +22,95 @@ final _inventoryProvider = FutureProvider.autoDispose<(List<Listing>, List<Reser
   );
 });
 
-/// Physical stock: what's free today, booked, out on hire, back for
-/// inspection and out of service. Every change goes through a stock RPC.
-class InventoryScreen extends ConsumerWidget {
+enum _StockFilter { all, attention, unlisted }
+
+/// Inventory = what the business owns. Every physical item, how many are free
+/// today, out on jobs, back for inspection or damaged. Adding stock here never
+/// puts it on the marketplace: that is a separate choice made in Listings.
+class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key, this.focusListingId});
   final String? focusListingId;
+  @override
+  ConsumerState<InventoryScreen> createState() => _InventoryScreenState();
+}
+
+class _InventoryScreenState extends ConsumerState<InventoryScreen> {
+  _StockFilter _filter = _StockFilter.all;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final data = ref.watch(_inventoryProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Inventory')),
+      appBar: AppBar(title: const Text('My stock'), centerTitle: false),
+      floatingActionButton: data.hasValue && data.value!.$1.isNotEmpty
+          ? FloatingActionButton.extended(
+              onPressed: () => addStockItem(context, ref),
+              backgroundColor: EvColors.forest,
+              foregroundColor: EvColors.inkOnDark,
+              icon: const Icon(LucideIcons.packagePlus),
+              label: const Text('Add item'),
+            )
+          : null,
       body: AsyncView(
         value: data,
         onRetry: () => ref.invalidate(_inventoryProvider),
         isEmpty: (d) => d.$1.isEmpty,
         empty: EmptyState(
           mascot: Mascot.crate,
-          title: 'No stock tracked',
-          body: 'Create a rental listing with a quantity to track availability by date.',
-          action: 'New rental listing',
-          onAction: () => context.push('/business/listings/new?kind=rental'),
+          title: 'Count what you own',
+          body: 'Add each item you hire out (chairs, tents, linen…) with how many you have. You decide later which ones appear on the marketplace.',
+          action: 'Add your first item',
+          onAction: () => addStockItem(context, ref),
         ),
         data: (d) {
           final (listings, reservations, conflicts) = d;
-          final sorted = [...listings]..sort((a, b) => a.id == focusListingId ? -1 : (b.id == focusListingId ? 1 : 0));
-          return ListView(padding: const EdgeInsets.only(bottom: EvSpace.x10), children: [
+          final today = EvDates.today();
+          int bookedToday(Listing l) => reservations
+              .where((r) => r.listingId == l.id && r.covers(today) && (r.status == ReservationStatus.confirmed || r.status == ReservationStatus.held))
+              .fold(0, (s, r) => s + r.quantity);
+          int outNow(Listing l) => reservations.where((r) => r.listingId == l.id && r.status == ReservationStatus.dispatched).fold(0, (s, r) => s + r.quantity);
+          final owned = listings.fold<int>(0, (s, l) => s + l.totalQuantity);
+          final out = listings.fold<int>(0, (s, l) => s + outNow(l));
+          final free = listings.fold<int>(0, (s, l) => s + (l.usable - bookedToday(l) - outNow(l)).clamp(0, 1 << 30));
+          bool needsAttention(Listing l) => l.inspectionQuantity > 0 || l.damagedQuantity > 0 || conflicts.any((c) => c.listingId == l.id);
+          final attention = listings.where(needsAttention).length;
+          final unlisted = listings.where((l) => l.status != ListingStatus.published).length;
+
+          final shown = switch (_filter) {
+            _StockFilter.all => listings,
+            _StockFilter.attention => listings.where(needsAttention).toList(),
+            _StockFilter.unlisted => listings.where((l) => l.status != ListingStatus.published).toList(),
+          };
+          final sorted = [...shown]..sort((a, b) => a.id == widget.focusListingId ? -1 : (b.id == widget.focusListingId ? 1 : a.title.compareTo(b.title)));
+
+          return ListView(padding: const EdgeInsets.only(bottom: 96), children: [
+            // What you own, at a glance.
+            Container(
+              margin: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, 0),
+              padding: const EdgeInsets.all(EvSpace.x4),
+              decoration: BoxDecoration(color: EvColors.forest, borderRadius: EvRadius.lgAll),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('WHAT YOU OWN', style: EvType.overline.copyWith(color: EvColors.sand)),
+                const SizedBox(height: 4),
+                Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  EvAnimatedCount(value: owned, style: EvType.display.copyWith(color: EvColors.inkOnDark)),
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('units · ${plural(listings.length, 'item')}', style: EvType.small.copyWith(color: EvColors.sand)),
+                  ),
+                ]),
+                const SizedBox(height: EvSpace.x3),
+                Row(children: [
+                  Expanded(child: _HeadStat('Free today', free, const Color(0xFFC9A27A))),
+                  Expanded(child: _HeadStat('Out on jobs', out, EvColors.inkOnDark)),
+                  Expanded(child: _HeadStat('Need attention', attention, attention > 0 ? const Color(0xFFE8B4A4) : EvColors.inkOnDark)),
+                ]),
+              ]),
+            ),
             if (conflicts.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, EvSpace.x3),
+                padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, 0),
                 child: EvSurface(
                   color: EvColors.warningTint,
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -57,7 +118,7 @@ class InventoryScreen extends ConsumerWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('Over-committed', style: EvType.bodyStrong.copyWith(color: EvColors.warning)),
+                        Text('Booked more than you have', style: EvType.bodyStrong.copyWith(color: EvColors.warning)),
                         for (final c in conflicts.take(3))
                           Text('${c.title}: ${c.committed} booked, ${c.usable} usable on ${EvDates.day(c.day)}', style: EvType.small.copyWith(color: EvColors.warning)),
                         const SizedBox(height: 6),
@@ -67,27 +128,32 @@ class InventoryScreen extends ConsumerWidget {
                   ]),
                 ),
               ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: EvSpace.gutter),
-              child: Wrap(spacing: 14, runSpacing: 6, children: [
-                _Key(EvColors.forest, 'Free today'),
-                _Key(EvColors.bronze, 'Booked today'),
-                _Key(EvColors.info, 'Out on hire'),
-                _Key(EvColors.warning, 'Awaiting inspection'),
-                _Key(EvColors.danger, 'Damaged'),
+            const SizedBox(height: EvSpace.x3),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
+              child: Row(children: [
+                EvChip(label: 'All ${listings.length}', selected: _filter == _StockFilter.all, onTap: () => setState(() => _filter = _StockFilter.all)),
+                const SizedBox(width: 8),
+                EvChip(label: 'Need attention $attention', icon: LucideIcons.wrench, selected: _filter == _StockFilter.attention, onTap: () => setState(() => _filter = _StockFilter.attention)),
+                const SizedBox(width: 8),
+                EvChip(label: 'Not on marketplace $unlisted', icon: LucideIcons.eyeOff, selected: _filter == _StockFilter.unlisted, onTap: () => setState(() => _filter = _StockFilter.unlisted)),
               ]),
             ),
             const SizedBox(height: EvSpace.x3),
-            for (final l in sorted)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, EvSpace.x3),
-                child: _StockCard(
-                  listing: l,
-                  reservations: reservations.where((r) => r.listingId == l.id).toList(),
-                  conflicts: conflicts.where((c) => c.listingId == l.id).toList(),
-                  highlighted: l.id == focusListingId,
+            if (sorted.isEmpty)
+              const EmptyState(title: 'Nothing here', body: 'No items match this filter.', compact: true)
+            else
+              for (final l in sorted)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, EvSpace.x3),
+                  child: _StockCard(
+                    listing: l,
+                    reservations: reservations.where((r) => r.listingId == l.id).toList(),
+                    conflicts: conflicts.where((c) => c.listingId == l.id).toList(),
+                    highlighted: l.id == widget.focusListingId,
+                  ),
                 ),
-              ),
           ]);
         },
       ),
@@ -95,16 +161,82 @@ class InventoryScreen extends ConsumerWidget {
   }
 }
 
-class _Key extends StatelessWidget {
-  const _Key(this.color, this.label);
-  final Color color;
+class _HeadStat extends StatelessWidget {
+  const _HeadStat(this.label, this.value, this.color);
   final String label;
+  final int value;
+  final Color color;
   @override
-  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
-        const SizedBox(width: 5),
-        Text(label, style: EvType.caption),
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        EvAnimatedCount(value: value, style: EvType.number.copyWith(color: color)),
+        Text(label, style: EvType.caption.copyWith(color: EvColors.sand)),
       ]);
+}
+
+/// Quick add: name, category, how many. No price or photos, and not on the
+/// marketplace until the vendor lists it.
+Future<void> addStockItem(BuildContext context, WidgetRef ref) async {
+  final biz = ref.read(myBusinessProvider).value;
+  if (biz == null) return;
+  final name = TextEditingController();
+  final cats = kCategories.where((c) => c.kind == OfferingType.rental).toList();
+  var category = cats.any((c) => c.id == biz.primaryCategory) ? biz.primaryCategory! : cats.first.id;
+  var qty = 10;
+  var condition = 'good';
+  final form = GlobalKey<FormState>();
+  final ok = await showEvSheet<bool>(
+    context,
+    title: 'Add a stock item',
+    subtitle: 'Something you own and hire out. It stays private until you list it.',
+    builder: (c) => StatefulBuilder(
+      builder: (c, set) => SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, EvSpace.x6 + MediaQuery.viewInsetsOf(c).bottom),
+        child: Form(
+          key: form,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+            EvField(
+              label: 'Item',
+              controller: name,
+              hint: 'e.g. White Chiavari chairs',
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              validator: (v) => (v == null || v.trim().length < 2) ? 'Name the item' : null,
+            ),
+            const SizedBox(height: EvSpace.x4),
+            const EvFieldLabel('Category'),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final cat in cats) EvChip(label: cat.name, icon: categoryIcon(cat.id), selected: category == cat.id, onTap: () => set(() => category = cat.id)),
+            ]),
+            const SizedBox(height: EvSpace.x4),
+            EvQuantityStepper(label: 'How many you own', value: qty, min: 1, step: qty >= 20 ? 10 : 1, onChanged: (v) => set(() => qty = v)),
+            const SizedBox(height: EvSpace.x4),
+            const EvFieldLabel('Condition'),
+            Wrap(spacing: 8, children: [
+              for (final (k, l) in const [('new', 'New'), ('excellent', 'Excellent'), ('good', 'Good'), ('fair', 'Fair')])
+                EvChip(label: l, selected: condition == k, onTap: () => set(() => condition = k)),
+            ]),
+            const SizedBox(height: EvSpace.x5),
+            EvButton('Add to my stock', icon: LucideIcons.check, expand: true, onPressed: () {
+              if (form.currentState!.validate()) Navigator.pop(c, true);
+            }),
+          ]),
+        ),
+      ),
+    ),
+  );
+  if (ok != true || !context.mounted) return;
+  final draft = ListingDraft(
+    businessId: biz.id,
+    kind: OfferingType.rental,
+    title: name.text.trim(),
+    categoryId: category,
+    status: ListingStatus.draft,
+    priceUnit: PriceUnit.onQuote,
+    condition: condition,
+    totalQuantity: qty,
+    tracksStock: true,
+  );
+  await guard(context, () => ref.read(backendProvider).listings.create(draft), success: 'Added $qty × ${draft.title} to your stock');
 }
 
 class _StockCard extends ConsumerWidget {
@@ -248,7 +380,7 @@ class _StockCard extends ConsumerWidget {
                 PopupMenuItem(value: 'remove', child: Text('Remove stock')),
                 PopupMenuItem(value: 'damage', child: Text('Damaged / repaired')),
                 PopupMenuItem(value: 'calendar', child: Text('Availability calendar')),
-                PopupMenuItem(value: 'edit', child: Text('Edit listing')),
+                PopupMenuItem(value: 'edit', child: Text('Edit details & marketplace listing')),
               ],
             ),
           ]),
@@ -283,12 +415,48 @@ class _StockCard extends ConsumerWidget {
                     onPressed: () => context.push('/now/new?category=${l.categoryId}&qty=${conflicts.first.shortfall}&item=${Uri.encodeComponent(l.title)}&date=${EvDates.iso(conflicts.first.day)}')),
             ]),
           ),
+        // Everyday stock changes, one tap away (damage and repairs: ⋮ menu).
+        Padding(
+          padding: const EdgeInsets.fromLTRB(EvSpace.x4, EvSpace.x3, EvSpace.x4, 0),
+          child: Row(children: [
+            Expanded(child: EvButton('Add', compact: true, kind: EvButtonKind.secondary, icon: LucideIcons.plus, expand: true, onPressed: () => _adjust(context, ref, true))),
+            const SizedBox(width: 8),
+            Expanded(child: EvButton('Remove', compact: true, kind: EvButtonKind.secondary, icon: LucideIcons.minus, expand: true, onPressed: l.usable == 0 ? null : () => _adjust(context, ref, false))),
+          ]),
+        ),
         if (upcoming.isNotEmpty) ...[
           const Padding(padding: EdgeInsets.only(top: EvSpace.x3), child: EvDivider(indent: EvSpace.x4)),
           for (final r in upcoming)
             _ReservationLine(reservation: r),
         ],
-        const SizedBox(height: EvSpace.x3),
+        // Marketplace: is this stock offered to other vendors?
+        const Padding(padding: EdgeInsets.only(top: EvSpace.x3), child: EvDivider(indent: 0)),
+        InkWell(
+          onTap: () => context.push('/business/listings/${l.id}'),
+          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(EvRadius.md)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(EvSpace.x4, 10, EvSpace.x3, 10),
+            child: Row(children: [
+              Icon(l.status == ListingStatus.published ? LucideIcons.store : LucideIcons.eyeOff, size: 16,
+                  color: l.status == ListingStatus.published ? EvColors.success : EvColors.ink3),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  switch (l.status) {
+                    ListingStatus.published => 'On the marketplace · ${priceLabel(l)}',
+                    ListingStatus.paused => 'Paused on the marketplace',
+                    _ => 'Not on the marketplace',
+                  },
+                  style: EvType.small.copyWith(color: l.status == ListingStatus.published ? EvColors.success : EvColors.ink2),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(l.status == ListingStatus.published ? 'Edit listing' : 'List it', style: EvType.smallStrong.copyWith(color: EvColors.forest)),
+              const Icon(LucideIcons.chevronRight, size: 16, color: EvColors.forest),
+            ]),
+          ),
+        ),
       ]),
     );
   }

@@ -141,9 +141,34 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.id == null ? 'New ${d.kind == OfferingType.rental ? 'rental' : d.kind.name} listing' : 'Edit listing'),
+        title: Text(widget.id == null
+            ? 'New ${d.kind == OfferingType.rental ? 'rental item' : d.kind.name}'
+            : (_original!.status == ListingStatus.published ? 'Marketplace listing' : 'List on the marketplace')),
         actions: [
-          if (_original != null) Padding(padding: const EdgeInsets.only(right: 12), child: StatusPill(_original!.status.label, tone: toneForListing(_original!.status), dense: true)),
+          if (_original != null) Padding(padding: const EdgeInsets.only(right: 4), child: StatusPill(_original!.status.label, tone: toneForListing(_original!.status), dense: true)),
+          if (_original != null && _original!.status != ListingStatus.archived)
+            PopupMenuButton<String>(
+              icon: const Icon(LucideIcons.ellipsisVertical, size: 18),
+              onSelected: (_) async {
+                final stock = _original!.tracksStock && !_original!.isService;
+                if (!await confirmAction(context,
+                    title: 'Archive “${_original!.title}”?',
+                    body: stock
+                        ? 'It leaves the marketplace and your stock list. Bookings already made are kept. You can restore it from Archived.'
+                        : 'It leaves the marketplace. Bookings already made are kept. You can restore it from Archived.',
+                    confirm: 'Archive',
+                    destructive: true)) {
+                  return;
+                }
+                if (!context.mounted) return;
+                final ok = await guard(context, () async {
+                  await ref.read(backendProvider).listings.setStatus(_original!.id, ListingStatus.archived);
+                  return true;
+                }, success: 'Archived');
+                if (ok == true && context.mounted) context.pop();
+              },
+              itemBuilder: (_) => const [PopupMenuItem(value: 'archive', child: Text('Archive'))],
+            ),
         ],
       ),
       body: Form(

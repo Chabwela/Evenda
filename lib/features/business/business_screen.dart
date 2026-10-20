@@ -91,19 +91,19 @@ class BusinessScreen extends ConsumerWidget {
 
         const SectionHeader('Catalogue'),
         group([
-          EvRow(
-            leading: const IconTile(LucideIcons.layoutGrid, tone: Tone.positive),
-            title: 'Listings',
-            subtitle: '$published published${drafts > 0 ? ' · $drafts draft${drafts == 1 ? '' : 's'}' : ''}',
-            onTap: () => context.push('/business/listings'),
-          ),
           if (biz.rents)
             EvRow(
               leading: const IconTile(LucideIcons.boxes, tone: Tone.positive),
-              title: 'Inventory',
-              subtitle: 'Stock, damage, returns awaiting inspection',
+              title: 'My stock',
+              subtitle: 'What you own: counts, damage, returns to check',
               onTap: () => context.push('/business/inventory'),
             ),
+          EvRow(
+            leading: const IconTile(LucideIcons.store, tone: Tone.positive),
+            title: 'On the marketplace',
+            subtitle: '$published live${drafts > 0 ? ' · $drafts not listed' : ''} · what other vendors see',
+            onTap: () => context.push('/business/listings'),
+          ),
           EvRow(
             leading: const IconTile(LucideIcons.calendarRange, tone: Tone.positive),
             title: 'Availability & jobs',
