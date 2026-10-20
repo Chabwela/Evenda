@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,7 +44,8 @@ class VendorShell extends ConsumerWidget {
       shell.goBranch(i, initialLocation: i == shell.currentIndex);
     }
 
-    final body = _IncomingBanner(child: shell);
+    // The incoming-notification banner sits above every route (app.dart).
+    final body = shell;
 
     if (wide) {
       return Scaffold(
@@ -183,110 +182,3 @@ class TabHeader extends ConsumerWidget implements PreferredSizeWidget {
   }
 }
 
-/// Slides a banner in from the top when a notification arrives while the
-/// app is open. Tapping opens it; it leaves on its own after 5 s.
-class _IncomingBanner extends ConsumerStatefulWidget {
-  const _IncomingBanner({required this.child});
-  final Widget child;
-
-  @override
-  ConsumerState<_IncomingBanner> createState() => _IncomingBannerState();
-}
-
-class _IncomingBannerState extends ConsumerState<_IncomingBanner> {
-  StreamSubscription<AppNotification>? _sub;
-  String? _subscribedFor;
-  AppNotification? _current;
-  Timer? _timer;
-
-  void _subscribe(String bizId) {
-    if (_subscribedFor == bizId) return;
-    _sub?.cancel();
-    _subscribedFor = bizId;
-    _sub = ref.read(backendProvider).notifications.incoming(bizId).listen((n) {
-      if (!mounted || n.digest) return;
-      HapticFeedback.lightImpact();
-      setState(() => _current = n);
-      _timer?.cancel();
-      _timer = Timer(const Duration(seconds: 5), () {
-        if (mounted) setState(() => _current = null);
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _sub?.cancel();
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  IconData _icon(NotificationCategory c) => switch (c) {
-        NotificationCategory.inventory => LucideIcons.packagePlus,
-        NotificationCategory.booking => LucideIcons.handshake,
-        NotificationCategory.task => LucideIcons.alarmClock,
-        NotificationCategory.now => LucideIcons.zap,
-        NotificationCategory.system => LucideIcons.bell,
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    final biz = ref.watch(myBusinessProvider).value;
-    if (biz != null) _subscribe(biz.id);
-    final n = _current;
-    return Stack(children: [
-      widget.child,
-      Positioned(
-        left: 12,
-        right: 12,
-        top: MediaQuery.paddingOf(context).top + 8,
-        child: AnimatedSwitcher(
-          duration: EvMotion.of(context, EvMotion.slow),
-          switchInCurve: EvMotion.spring,
-          switchOutCurve: EvMotion.accelerate,
-          transitionBuilder: (child, a) => SlideTransition(
-            position: Tween(begin: const Offset(0, -1.3), end: Offset.zero).animate(a),
-            child: FadeTransition(opacity: a, child: child),
-          ),
-          child: n == null
-              ? const SizedBox.shrink(key: ValueKey('none'))
-              : Material(
-                  key: ValueKey(n.id),
-                  color: EvColors.ink,
-                  borderRadius: EvRadius.mdAll,
-                  elevation: 0,
-                  child: InkWell(
-                    borderRadius: EvRadius.mdAll,
-                    onTap: () {
-                      setState(() => _current = null);
-                      ref.read(backendProvider).notifications.markRead(n.id);
-                      if (n.route != null) context.push(n.route!);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(borderRadius: EvRadius.mdAll, boxShadow: EvShadow.floating),
-                      child: Row(children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(color: n.category == NotificationCategory.now ? EvColors.bronze : EvColors.forestSoft, borderRadius: EvRadius.smAll),
-                          child: Icon(_icon(n.category), size: 18, color: EvColors.inkOnDark),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                            Text(n.title, style: EvType.smallStrong.copyWith(color: EvColors.inkOnDark), maxLines: 2, overflow: TextOverflow.ellipsis),
-                            if (n.body.isNotEmpty)
-                              Text(n.body, style: EvType.caption.copyWith(color: EvColors.sand), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          ]),
-                        ),
-                        const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.sand),
-                      ]),
-                    ),
-                  ),
-                ),
-        ),
-      ),
-    ]);
-  }
-}

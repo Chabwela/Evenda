@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../design/ev.dart';
+import 'incoming_banner.dart';
 import 'providers.dart';
 import 'router.dart';
 
@@ -29,7 +30,7 @@ class EvendaApp extends ConsumerWidget {
               ref.read(revisionProvider.notifier).bumpAll();
               ref.invalidate(myBusinessProvider);
             },
-            child: child!,
+            child: IncomingBanner(child: child!),
           ),
         );
       },
