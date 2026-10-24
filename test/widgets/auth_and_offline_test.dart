@@ -96,7 +96,7 @@ void main() {
       phone(t);
       await t.pumpWidget(host(Scaffold(body: OfflineState(onRetry: () {})), online: false));
       await settle(t);
-      expect(find.text('You’re offline'), findsOneWidget);
+      expect(find.text('No internet connection'), findsOneWidget);
       expect(find.text('Try again'), findsOneWidget);
       _backend.dispose();
     });
@@ -105,7 +105,7 @@ void main() {
       phone(t);
       await t.pumpWidget(host(Scaffold(body: OfflineState(onRetry: () {}))));
       await settle(t);
-      expect(find.text('Evenda can’t be reached'), findsOneWidget);
+      expect(find.text('Can’t reach Evenda'), findsOneWidget);
       expect(find.textContaining('data balance'), findsOneWidget);
       _backend.dispose();
     });
@@ -114,7 +114,7 @@ void main() {
       phone(t);
       await t.pumpWidget(host(Scaffold(body: ErrorState(error: Exception('SocketException: Failed host lookup'), onRetry: () {})), online: false));
       await settle(t);
-      expect(find.text('You’re offline'), findsOneWidget);
+      expect(find.text('No internet connection'), findsOneWidget);
       expect(find.text('Couldn’t load this'), findsNothing);
       _backend.dispose();
     });

@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -10,10 +10,14 @@ import '../motion.dart';
 import '../theme.dart';
 import '../tokens.dart';
 import 'controls.dart';
-import 'logo.dart';
 
-/// Full offline state: the Evenda mark sends out signal arcs while it waits,
-/// and the screen reloads itself as soon as the connection comes back.
+/// Full-page offline states on screen; the strip steps aside while one shows,
+/// so "No internet connection" appears once.
+final _offlinePages = ValueNotifier<int>(0);
+
+/// Full offline state, kept as plain as the big apps do it: one icon, a short
+/// title, one sentence, "Try again". The screen reloads itself as soon as the
+/// connection comes back, and keeps retrying quietly while it waits.
 class OfflineState extends ConsumerStatefulWidget {
   const OfflineState({super.key, this.onRetry, this.compact = false});
   final VoidCallback? onRetry;
@@ -23,13 +27,14 @@ class OfflineState extends ConsumerStatefulWidget {
   ConsumerState<OfflineState> createState() => _OfflineStateState();
 }
 
-class _OfflineStateState extends ConsumerState<OfflineState> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
+class _OfflineStateState extends ConsumerState<OfflineState> {
   Timer? _autoRetry;
+  bool _trying = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _offlinePages.value++);
     // Connected but nothing gets through (no data bundle, captive Wi-Fi):
     // the radio never flips, so keep quietly retrying in the background.
     _autoRetry = Timer.periodic(const Duration(seconds: 15), (_) {
@@ -38,20 +43,18 @@ class _OfflineStateState extends ConsumerState<OfflineState> with SingleTickerPr
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (EvMotion.reduced(context)) {
-      _c.value = 0.5;
-    } else if (!_c.isAnimating) {
-      _c.repeat();
-    }
-  }
-
-  @override
   void dispose() {
     _autoRetry?.cancel();
-    _c.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _offlinePages.value--);
     super.dispose();
+  }
+
+  // A short spinner on the button, so a tap visibly does something.
+  Future<void> _retry() async {
+    setState(() => _trying = true);
+    widget.onRetry?.call();
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    if (mounted) setState(() => _trying = false);
   }
 
   @override
@@ -61,116 +64,55 @@ class _OfflineStateState extends ConsumerState<OfflineState> with SingleTickerPr
       if (prev?.value == false && next.value == true) widget.onRetry?.call();
     });
     final online = ref.watch(onlineProvider).value ?? false;
-    final art = widget.compact ? 120.0 : 168.0;
 
     return Center(
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: EvSpace.x8, vertical: widget.compact ? EvSpace.x5 : EvSpace.x8),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ExcludeSemantics(
-            child: SizedBox.square(
-              dimension: art,
-              child: AnimatedBuilder(
-                animation: _c,
-                builder: (_, child) => CustomPaint(painter: _SignalPainter(_c.value), child: child),
-                child: Align(
-                  alignment: const Alignment(0, 0.55),
-                  child: Container(
-                    width: art * 0.46,
-                    height: art * 0.46,
-                    decoration: BoxDecoration(color: EvColors.warmWhite, shape: BoxShape.circle, border: Border.all(color: EvColors.hairline, width: 1.5), boxShadow: EvShadow.raised),
-                    child: Center(child: EvendaMark(size: art * 0.3)),
-                  ),
-                ),
-              ),
+        padding: EdgeInsets.symmetric(
+          horizontal: EvSpace.x8,
+          vertical: widget.compact ? EvSpace.x5 : EvSpace.x8,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              online ? LucideIcons.cloudOff : LucideIcons.wifiOff,
+              size: widget.compact ? 32 : 40,
+              color: EvColors.ink3,
             ),
-          ),
-          const SizedBox(height: EvSpace.x4),
-          Text(online ? 'Evenda can’t be reached' : 'You’re offline', style: widget.compact ? EvType.headline : EvType.displaySm, textAlign: TextAlign.center),
-          const SizedBox(height: EvSpace.x2),
-          Text(
-            online
-                ? 'Your phone is connected, but the internet isn’t getting through. Check your data balance or Wi-Fi, then try again.'
-                : 'Turn on mobile data or Wi-Fi. Evenda needs internet to show live stock, quotes and bookings.',
-            style: EvType.small,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: EvSpace.x4),
-          _WaitingLine(controller: _c, online: online),
-          if (widget.onRetry != null) ...[
             const SizedBox(height: EvSpace.x4),
-            EvButton('Try again', onPressed: widget.onRetry, kind: EvButtonKind.secondary, icon: LucideIcons.refreshCw, compact: true),
+            Text(
+              online ? 'Can’t reach Evenda' : 'No internet connection',
+              style: EvType.headline,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: EvSpace.x2),
+            Text(
+              online
+                  ? 'Your connection isn’t getting through. Check your data balance or Wi-Fi.'
+                  : 'Turn on mobile data or Wi-Fi to continue.',
+              style: EvType.small,
+              textAlign: TextAlign.center,
+            ),
+            if (widget.onRetry != null) ...[
+              const SizedBox(height: EvSpace.x5),
+              EvButton(
+                'Try again',
+                onPressed: _trying ? null : _retry,
+                loading: _trying,
+                kind: EvButtonKind.secondary,
+                compact: true,
+              ),
+            ],
           ],
-        ]),
+        ),
       ),
     );
   }
 }
 
-class _WaitingLine extends StatelessWidget {
-  const _WaitingLine({required this.controller, required this.online});
-  final AnimationController controller;
-  final bool online;
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-        animation: controller,
-        builder: (_, _) {
-          final dots = '.' * (1 + (controller.value * 3).floor() % 3);
-          return Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 7, height: 7, decoration: BoxDecoration(color: online ? EvColors.warning : EvColors.ink3, shape: BoxShape.circle)),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 220,
-              child: Text(
-                online ? 'Reconnecting$dots' : 'Waiting for a connection$dots',
-                style: EvType.caption,
-                textAlign: TextAlign.left,
-              ),
-            ),
-          ]);
-        },
-      );
-}
-
-/// Three arcs above the mark, rising and fading one after another like a
-/// signal searching for a tower. A small bronze slash crosses the outer arc.
-class _SignalPainter extends CustomPainter {
-  _SignalPainter(this.t);
-  final double t;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height * 0.775);
-    final base = size.width * 0.3;
-    for (var i = 0; i < 3; i++) {
-      final phase = (t - i * 0.18) % 1.0;
-      final glow = math.sin(phase * math.pi).clamp(0.0, 1.0);
-      final r = base + i * size.width * 0.12;
-      final paint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = size.width * 0.035
-        ..color = Color.lerp(EvColors.sand, EvColors.forestSoft, glow * 0.85)!;
-      canvas.drawArc(Rect.fromCircle(center: c, radius: r), math.pi * 1.22, math.pi * 0.56, false, paint);
-    }
-    // The "no signal" slash, gently breathing.
-    final outer = base + 2 * size.width * 0.12;
-    final s = 0.85 + 0.15 * math.sin(t * math.pi * 2);
-    final a = Offset(c.dx + outer * 0.5 * s, c.dy - outer * 1.02 * s);
-    final b = Offset(c.dx + outer * 0.86 * s, c.dy - outer * 0.62 * s);
-    canvas.drawLine(a, b, Paint()
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = size.width * 0.035
-      ..color = EvColors.bronze);
-  }
-
-  @override
-  bool shouldRepaint(_SignalPainter old) => old.t != t;
-}
-
-/// App-wide strip that slides in under the status bar when the connection
-/// drops, and briefly says "Back online" when it returns.
+/// App-wide connection strip, the way the big apps do it: a slim full-width
+/// bar at the top that pushes the screen down (nothing floats over content),
+/// "No internet connection" while offline, then green "Back online" for 2 s.
 class OfflineBanner extends ConsumerStatefulWidget {
   const OfflineBanner({super.key, required this.child, this.onReconnect});
   final Widget child;
@@ -197,7 +139,7 @@ class _OfflineBannerState extends ConsumerState<OfflineBanner> {
         widget.onReconnect?.call();
         setState(() => _showBack = true);
         _timer?.cancel();
-        _timer = Timer(const Duration(milliseconds: 2600), () {
+        _timer = Timer(const Duration(seconds: 2), () {
           if (mounted) setState(() => _showBack = false);
         });
       } else if (next.value == false) {
@@ -206,98 +148,62 @@ class _OfflineBannerState extends ConsumerState<OfflineBanner> {
       }
     });
     final offline = ref.watch(onlineProvider).value == false;
-    final visible = offline || _showBack;
-    final top = MediaQuery.paddingOf(context).top;
+    return ValueListenableBuilder<int>(
+      valueListenable: _offlinePages,
+      builder: (context, pages, _) => _strip(context, offline, pages > 0),
+    );
+  }
 
-    return Stack(children: [
-      widget.child,
-      Positioned(
-        left: 0,
-        right: 0,
-        top: 0,
-        child: IgnorePointer(
-          child: AnimatedSlide(
-            offset: visible ? Offset.zero : const Offset(0, -1.2),
-            duration: EvMotion.of(context, EvMotion.slow),
-            curve: visible ? EvMotion.spring : EvMotion.accelerate,
-            child: AnimatedOpacity(
-              opacity: visible ? 1 : 0,
-              duration: EvMotion.of(context, EvMotion.base),
+  Widget _strip(BuildContext context, bool offline, bool pageSaysOffline) {
+    final visible = (offline && !pageSaysOffline) || _showBack;
+    final top = MediaQuery.paddingOf(context).top;
+    final color = offline ? EvColors.ink : EvColors.success;
+
+    final body = Column(
+      children: [
+        // The strip owns the status-bar area while it shows.
+        AnimatedContainer(
+          duration: EvMotion.of(context, EvMotion.base),
+          curve: Curves.easeOut,
+          height: visible ? top + 28 : 0,
+          color: color,
+          // Material gives the text its style: the strip sits above the app's screens.
+          child: Material(
+            type: MaterialType.transparency,
+            child: ClipRect(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(EvSpace.gutter, top + 6, EvSpace.gutter, 0),
-                child: Center(
-                  child: Semantics(
-                    liveRegion: true,
-                    child: _BannerPill(back: !offline && _showBack),
+                padding: EdgeInsets.only(top: top),
+                child: Semantics(
+                  liveRegion: true,
+                  child: Center(
+                    child: Text(
+                      offline ? 'No internet connection' : 'Back online',
+                      style: EvType.caption.copyWith(
+                        color: EvColors.inkOnDark,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                    ),
                   ),
                 ),
               ),
             ),
           ),
         ),
-      ),
-    ]);
-  }
-}
-
-class _BannerPill extends StatefulWidget {
-  const _BannerPill({required this.back});
-  final bool back;
-
-  @override
-  State<_BannerPill> createState() => _BannerPillState();
-}
-
-class _BannerPillState extends State<_BannerPill> with SingleTickerProviderStateMixin {
-  late final _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (EvMotion.reduced(context)) {
-      _pulse.value = 1;
-    } else if (!_pulse.isAnimating) {
-      _pulse.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _pulse.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final back = widget.back;
-    return Material(
-      color: Colors.transparent,
-      child: AnimatedContainer(
-        duration: EvMotion.of(context, EvMotion.base),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(
-          color: back ? EvColors.success : EvColors.forest,
-          borderRadius: BorderRadius.circular(999),
-          boxShadow: EvShadow.raised,
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (back)
-            const Icon(LucideIcons.wifi, size: 16, color: EvColors.inkOnDark)
-          else
-            FadeTransition(
-              opacity: Tween(begin: 0.35, end: 1.0).animate(_pulse),
-              child: const Icon(LucideIcons.wifiOff, size: 16, color: Color(0xFFC9A27A)),
-            ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              back ? 'Back online — refreshing' : 'No internet · Evenda will reconnect automatically',
-              style: EvType.smallStrong.copyWith(color: EvColors.inkOnDark),
-              overflow: TextOverflow.ellipsis,
-            ),
+        Expanded(
+          child: MediaQuery.removePadding(
+            context: context,
+            removeTop: visible,
+            child: widget.child,
           ),
-        ]),
-      ),
+        ),
+      ],
+    );
+    // Light status-bar icons on the dark strip, dark again afterwards (Android
+    // keeps the last style). Screens with their own style still win: theirs is deeper.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: visible ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      child: body,
     );
   }
 }
