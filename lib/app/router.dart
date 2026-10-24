@@ -29,6 +29,7 @@ import '../features/find/quote_request_screen.dart';
 import '../features/find/supplier_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/notifications/notifications_screen.dart';
+import '../features/now/incoming_request.dart';
 import '../features/now/now_create.dart';
 import '../features/now/now_home.dart';
 import '../features/now/now_live.dart';
@@ -151,6 +152,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       _r('/now/new', (s) => NowCreateScreen(categoryId: s.uri.queryParameters['category'], quantity: int.tryParse(s.uri.queryParameters['qty'] ?? ''),
           item: s.uri.queryParameters['item'], date: s.uri.queryParameters['date'])),
       _r('/now/respond/:id', (s) => NowRespondScreen(id: s.pathParameters['id']!)),
+      _r('/now/incoming/:id', (s) => IncomingRequestScreen(id: s.pathParameters['id']!)),
       _r('/now/:id', (s) => NowLiveScreen(id: s.pathParameters['id']!)),
       _r('/admin/business/:id', (s) => AdminBusinessReviewScreen(id: s.pathParameters['id']!)),
       _r('/admin/dispute/:id', (s) => AdminDisputeCaseScreen(id: s.pathParameters['id']!)),

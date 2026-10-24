@@ -38,6 +38,15 @@ class _IncomingBannerState extends ConsumerState<IncomingBanner> {
     if (bizId == null) return;
     _sub = ref.read(backendProvider).notifications.incoming(bizId).listen((n) {
       if (!mounted || n.digest) return;
+      // A new Evenda Now request for this supplier rings like a call.
+      final route = n.route ?? '';
+      if (route.startsWith('/now/respond/')) {
+        final id = route.substring('/now/respond/'.length);
+        final router = ref.read(routerProvider);
+        final here = router.routerDelegate.currentConfiguration.uri.path;
+        if (here != '/now/incoming/$id' && here != route) router.push('/now/incoming/$id');
+        return;
+      }
       final urgent = n.category == NotificationCategory.now;
       urgent ? HapticFeedback.heavyImpact() : HapticFeedback.lightImpact();
       setState(() => _current = n);
