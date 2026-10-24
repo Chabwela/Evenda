@@ -161,8 +161,9 @@ class MainActivity : FlutterActivity() {
      * Push channels. The send-push Edge Function picks one per message:
      *  evenda_urgent_v2  — Evenda Now requests and offers, critical reminders.
      *                      High importance (pops up) with the longer Evenda alert.
-     *  evenda_default_v2 — bookings, quotes, reminders, supplier updates,
-     *                      with the short Evenda chime.
+     *  evenda_activity_v1 — quote requests, quotations, bookings and payments.
+     *                      High importance (pops up) with the short Evenda chime.
+     *  evenda_default_v2 — reminders and supplier updates, with the chime.
      * Android fixes a channel's sound when it is created, so changing a sound
      * means a new channel ID (and deleting the old one).
      */
@@ -188,8 +189,15 @@ class MainActivity : FlutterActivity() {
             }
         )
         manager.createNotificationChannel(
-            NotificationChannel("evenda_default_v2", "Bookings and reminders", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Quotes, bookings, task reminders and supplier updates"
+            NotificationChannel("evenda_activity_v1", "Quotes and bookings", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Quote requests, quotations, bookings and payments"
+                setSound(sound("evenda_chime"), audio)
+                enableVibration(true)
+            }
+        )
+        manager.createNotificationChannel(
+            NotificationChannel("evenda_default_v2", "Reminders and updates", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Task reminders and supplier updates"
                 setSound(sound("evenda_chime"), audio)
             }
         )

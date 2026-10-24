@@ -78,6 +78,12 @@ function urgent(item: Claimed): boolean {
   return item.data.category === "now" || item.data.urgent === true || item.data.urgent === "true";
 }
 
+// Quote requests, quotations, bookings and payments: pop up (high priority on
+// the app's "Quotes and bookings" channel) with the short chime.
+function activity(item: Claimed): boolean {
+  return item.data.category === "booking";
+}
+
 // A new Evenda Now request for a supplier (route /now/respond/<id>).
 function nowRequest(item: Claimed): boolean {
   return typeof item.data.route === "string" && item.data.route.startsWith("/now/respond/");
@@ -108,9 +114,12 @@ async function sendOne(sa: ServiceAccount, token: string, item: Claimed): Promis
         notification: { title: item.title, body: item.body },
         data: stringify(item.data),
         // Channels are created by the app (MainActivity). Urgent = Evenda Now and
-        // critical reminders: high priority on the pop-up-and-sound channel.
+        // critical reminders (long alert); activity = quotes and bookings (pops up
+        // with the chime); the rest = reminders and updates.
         android: urgent(item)
           ? { priority: "HIGH", notification: { channel_id: "evenda_urgent_v2", sound: "evenda_urgent", tag: String(item.data.notification_id ?? "") } }
+          : activity(item)
+          ? { priority: "HIGH", notification: { channel_id: "evenda_activity_v1", sound: "evenda_chime", tag: String(item.data.notification_id ?? "") } }
           : { priority: "NORMAL", notification: { channel_id: "evenda_default_v2", sound: "evenda_chime", tag: String(item.data.notification_id ?? "") } },
         apns: { payload: { aps: { sound: "default", ...(urgent(item) ? { "interruption-level": "time-sensitive" } : {}) } } },
       },
