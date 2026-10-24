@@ -15,6 +15,23 @@ final _notificationsProvider = FutureProvider.autoDispose<List<AppNotification>>
   return ref.watch(backendProvider).notifications.list(ref.watch(bizIdProvider));
 });
 
+/// While quiet hours are on, pushes (except Evenda Now and critical deadlines)
+/// wait until they end; the list still fills. Say so, so a missing pop-up
+/// isn't a mystery. Returns when quiet hours end, or null outside them.
+final _quietUntilProvider = FutureProvider.autoDispose<DateTime?>((ref) async {
+  ref.watchDomains(const [DataDomain.notifications]);
+  final p = await ref.watch(backendProvider).notifications.prefs(ref.watch(bizIdProvider));
+  final now = DateTime.now();
+  final midnight = DateTime(now.year, now.month, now.day);
+  final t = now.difference(midnight);
+  final start = p.quietStart, end = p.quietEnd;
+  if (start == end) return null;
+  final inQuiet = start > end ? (t >= start || t < end) : (t >= start && t < end);
+  if (!inQuiet) return null;
+  final endToday = midnight.add(end);
+  return endToday.isAfter(now) ? endToday : endToday.add(const Duration(days: 1));
+});
+
 enum _Filter { all, inventory, bookings, tasks }
 
 class NotificationsScreen extends ConsumerStatefulWidget {
@@ -100,6 +117,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               groups.putIfAbsent(k, () => []).add(n);
             }
             return ListView(padding: const EdgeInsets.only(bottom: EvSpace.x10), children: [
+              const _QuietHoursLine(),
               for (final e in groups.entries) ...[
                 SectionHeader(e.key),
                 for (final (i, n) in e.value.indexed) ...[
@@ -163,6 +181,32 @@ class _NotificationRow extends StatelessWidget {
             ]),
           ),
           if (n.unread) Container(margin: const EdgeInsets.only(top: 6, left: 8), width: 8, height: 8, decoration: const BoxDecoration(color: EvColors.bronze, shape: BoxShape.circle)),
+        ]),
+      ),
+    );
+  }
+}
+
+
+class _QuietHoursLine extends ConsumerWidget {
+  const _QuietHoursLine();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final until = ref.watch(_quietUntilProvider).value;
+    if (until == null) return const SizedBox.shrink();
+    return InkWell(
+      onTap: () => context.push('/business/notifications'),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, 0),
+        child: Row(children: [
+          const Icon(LucideIcons.moon, size: 16, color: EvColors.ink3),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('Quiet hours: pop-ups are paused until ${EvDates.time(until)}. Evenda Now still alerts you.',
+                style: EvType.small),
+          ),
+          Text('Change', style: EvType.smallStrong.copyWith(color: EvColors.forest)),
         ]),
       ),
     );

@@ -6,11 +6,48 @@ import 'incoming_banner.dart';
 import 'providers.dart';
 import 'router.dart';
 
-class EvendaApp extends ConsumerWidget {
+class EvendaApp extends ConsumerStatefulWidget {
   const EvendaApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EvendaApp> createState() => _EvendaAppState();
+}
+
+class _EvendaAppState extends ConsumerState<EvendaApp> with WidgetsBindingObserver {
+  DateTime? _backgroundSince;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Android drops the live connection while Evenda is in the background, so
+  /// notifications, quotes and bookings that arrived meanwhile were missing
+  /// (and the bell didn't count them) until a restart. Coming back after more
+  /// than a few seconds reconnects and refreshes everything.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      _backgroundSince ??= DateTime.now();
+    } else if (state == AppLifecycleState.resumed) {
+      final since = _backgroundSince;
+      _backgroundSince = null;
+      if (since != null && DateTime.now().difference(since) > const Duration(seconds: 5)) {
+        ref.read(backendProvider).reconnect();
+        ref.read(revisionProvider.notifier).bumpAll();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Rebuild once the live category catalogue arrives, so pickers show it.
     ref.watch(categoryCatalogProvider);
     return MaterialApp.router(
