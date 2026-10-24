@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../app/providers.dart';
+import '../../core/alert_tone.dart';
 import '../../data/backend.dart';
 import '../../design/ev.dart';
 import '../../domain/models.dart';
@@ -89,6 +91,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
               value: p.nowRequests,
               onChanged: (v) => _set(p.copyWith(nowRequests: v)),
             ),
+            if (p.nowRequests && !kIsWeb && defaultTargetPlatform == TargetPlatform.android) const _RingLikeACall(),
             const SectionHeader('Quiet hours', padding: EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
             Text('No pushes in this window except critical deadlines and Evenda Now. Everything waits in your notification centre.', style: EvType.small),
             const SizedBox(height: EvSpace.x3),
@@ -170,4 +173,73 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
       ),
     );
   }
+}
+
+
+/// Lets an Evenda Now request ring like a call when Evenda is closed: Android 14+
+/// asks the user to allow full-screen alerts, and some phone makers stop
+/// closed apps from waking unless battery saving is turned off for them.
+class _RingLikeACall extends StatefulWidget {
+  const _RingLikeACall();
+  @override
+  State<_RingLikeACall> createState() => _RingLikeACallState();
+}
+
+class _RingLikeACallState extends State<_RingLikeACall> with WidgetsBindingObserver {
+  bool? _fullScreen;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _check();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Coming back from system settings: show the new state.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    if (s == AppLifecycleState.resumed) _check();
+  }
+
+  Future<void> _check() async {
+    final ok = await AlertTone.fullScreenAllowed();
+    if (mounted) setState(() => _fullScreen = ok);
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: EvSpace.x2, bottom: EvSpace.x2),
+        child: EvSurface(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Ring like a call', style: EvType.bodyStrong),
+            const SizedBox(height: 4),
+            Text('When a request comes in and Evenda is closed, your phone rings and the request opens full screen, even on the lock screen.',
+                style: EvType.small),
+            const SizedBox(height: EvSpace.x3),
+            Row(children: [
+              Icon(_fullScreen == false ? LucideIcons.circleAlert : LucideIcons.circleCheck, size: 18,
+                  color: _fullScreen == false ? EvColors.warning : EvColors.success),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(_fullScreen == false ? 'Full-screen alerts are off for Evenda' : 'Full-screen alerts are allowed',
+                    style: EvType.smallStrong),
+              ),
+              if (_fullScreen == false) TextButton(onPressed: AlertTone.openFullScreenSettings, child: const Text('Allow')),
+            ]),
+            const EvDivider(indent: 0),
+            Row(children: [
+              const Icon(LucideIcons.batteryCharging, size: 18, color: EvColors.ink3),
+              const SizedBox(width: 8),
+              Expanded(child: Text('If requests don\u2019t ring when Evenda is closed, let it run without battery limits.', style: EvType.small)),
+              TextButton(onPressed: AlertTone.openBatterySettings, child: const Text('Open')),
+            ]),
+          ]),
+        ),
+      );
 }

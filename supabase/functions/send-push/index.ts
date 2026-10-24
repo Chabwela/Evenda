@@ -78,12 +78,32 @@ function urgent(item: Claimed): boolean {
   return item.data.category === "now" || item.data.urgent === true || item.data.urgent === "true";
 }
 
+// A new Evenda Now request for a supplier (route /now/respond/<id>).
+function nowRequest(item: Claimed): boolean {
+  return typeof item.data.route === "string" && item.data.route.startsWith("/now/respond/");
+}
+
+// Android: data-only and high priority, so the app's EvendaMessagingService
+// wakes even when Evenda is closed and rings like a call (full-screen,
+// repeating). iOS still gets a normal time-sensitive alert.
+function nowRequestMessage(token: string, item: Claimed) {
+  return {
+    token,
+    data: stringify({ ...item.data, kind: "now_request", title: item.title, body: item.body }),
+    android: { priority: "HIGH", ttl: "900s" },
+    apns: {
+      headers: { "apns-priority": "10" },
+      payload: { aps: { alert: { title: item.title, body: item.body }, sound: "default", "interruption-level": "time-sensitive" } },
+    },
+  };
+}
+
 async function sendOne(sa: ServiceAccount, token: string, item: Claimed): Promise<{ ok: boolean; stale: boolean; error?: string }> {
   const res = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
     method: "POST",
     headers: { "Authorization": `Bearer ${await accessToken(sa)}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      message: {
+      message: nowRequest(item) ? nowRequestMessage(token, item) : {
         token,
         notification: { title: item.title, body: item.body },
         data: stringify(item.data),

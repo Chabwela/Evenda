@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
 import '../data/backend.dart';
+import 'alert_tone.dart';
 
 /// Firebase Cloud Messaging integration boundary.
 ///
@@ -16,6 +17,10 @@ abstract final class PushService {
   static final tapRoutes = ValueNotifier<String?>(null);
 
   static Future<void> init(Backend backend) async {
+    // The call-style Evenda Now alert (Android) opens screens the same way.
+    AlertTone.onOpen((route) => tapRoutes.value = route);
+    final launched = await AlertTone.launchRoute();
+    if (launched != null && launched.startsWith('/')) tapRoutes.value = launched;
     try {
       await Firebase.initializeApp();
       final fm = FirebaseMessaging.instance;

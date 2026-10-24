@@ -68,6 +68,13 @@ flutter {
     source = "../.."
 }
 
+dependencies {
+    // EvendaMessagingService builds the call-style Evenda Now alert. Same
+    // Firebase BoM as firebase_core 5.0.0, so there is one firebase-messaging.
+    implementation(platform("com.google.firebase:firebase-bom:35.0.0"))
+    implementation("com.google.firebase:firebase-messaging")
+}
+
 // Push notifications: Firebase reads android/app/google-services.json at build
 // time. Until that file is added the app builds without push (in-app
 // notifications still work), so a missing file never breaks the build.

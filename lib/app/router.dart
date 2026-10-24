@@ -165,26 +165,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         )),
   );
 
-  // Taps on push notifications.
-  void openPush() {
-    final r = PushService.tapRoutes.value;
-    if (r != null) {
-      router.push(r);
-      PushService.tapRoutes.value = null;
-    }
-  }
-
-  PushService.tapRoutes.addListener(openPush);
-  ref.onDispose(() {
-    PushService.tapRoutes.removeListener(openPush);
-    refresh.dispose();
-  });
+  ref.onDispose(refresh.dispose);
   // Open the screen a tapped push notification points to, once the vendor
   // is signed in with a finished business (cold starts wait for that).
   void openTapped() {
     final route = PushService.tapRoutes.value;
     final b = ref.read(myBusinessProvider).value;
     if (route == null || ref.read(sessionProvider).value == null || b == null || !b.onboardingCompleted) return;
+    if (!ref.read(launchIntroDoneProvider)) return; // after the splash, or the launch redirect would replace it
     PushService.tapRoutes.value = null;
     // Let the launch redirect to /home settle first, so Back returns there.
     Future.delayed(const Duration(milliseconds: 350), () => router.push(route));
@@ -192,6 +180,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   PushService.tapRoutes.addListener(openTapped);
   ref.listen(myBusinessProvider, (_, _) => openTapped());
+  ref.listen(launchIntroDoneProvider, (_, _) => openTapped());
   ref.onDispose(() => PushService.tapRoutes.removeListener(openTapped));
   return router;
 });

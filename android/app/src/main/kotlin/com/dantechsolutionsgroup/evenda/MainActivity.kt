@@ -4,6 +4,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.ContentResolver
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
+import android.view.WindowManager
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
@@ -20,6 +23,13 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    companion object {
+        /** True while Evenda is on screen (then the app shows its own alert). */
+        @Volatile var visible = false
+    }
+
+    private var channel: MethodChannel? = null
+    private var launchRoute: String? = null
     private var player: MediaPlayer? = null
     private val handler = Handler(Looper.getMainLooper())
     private val stopRinging = Runnable { stopAlert() }
@@ -27,6 +37,40 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         createNotificationChannels()
+        IncomingAlert.ensureChannel(this)
+        handleAlertIntent(intent, cold = true)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAlertIntent(intent, cold = false)
+    }
+
+    /** Opened from the call-style alert: show the screen it points to. */
+    private fun handleAlertIntent(intent: Intent?, cold: Boolean) {
+        val route = intent?.getStringExtra(IncomingAlert.EXTRA_ROUTE) ?: return
+        intent.removeExtra(IncomingAlert.EXTRA_ROUTE)
+        // The incoming screen shows over the lock screen like a call; after
+        // answering, Evenda goes back behind the lock (setLocked(false) on stop).
+        if (route.startsWith("/now/incoming/")) showOverLockScreen(true)
+        if (cold || channel == null) launchRoute = route else channel?.invokeMethod("open", route)
+    }
+
+    private fun showOverLockScreen(on: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(on)
+            setTurnScreenOn(on)
+        } else {
+            @Suppress("DEPRECATION")
+            val flags = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            if (on) window.addFlags(flags) else window.clearFlags(flags)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        visible = true
     }
 
     /**
@@ -37,11 +81,18 @@ class MainActivity : FlutterActivity() {
      */
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "evenda/alert").setMethodCallHandler { call, result ->
-            when (call.method) {
-                "ring" -> { startAlert(); result.success(null) }
-                "stop" -> { stopAlert(); result.success(null) }
-                else -> result.notImplemented()
+        channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "evenda/alert").apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    // The app's own screen takes over from the ringing notification.
+                    "ring" -> { IncomingAlert.cancelAll(this@MainActivity); startAlert(); result.success(null) }
+                    "stop" -> { stopAlert(); showOverLockScreen(false); result.success(null) }
+                    "launchRoute" -> { result.success(launchRoute); launchRoute = null }
+                    "fullScreenAllowed" -> result.success(fullScreenAllowed())
+                    "openFullScreenSettings" -> { openFullScreenSettings(); result.success(null) }
+                    "openBatterySettings" -> { openBatterySettings(); result.success(null) }
+                    else -> result.notImplemented()
+                }
             }
         }
     }
@@ -81,8 +132,29 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onPause() {
+        visible = false
         stopAlert() // leaving the app silences the alert
         super.onPause()
+    }
+
+    /** Android 14+ asks the user before an app may open full screen over the lock screen. */
+    private fun fullScreenAllowed(): Boolean =
+        if (Build.VERSION.SDK_INT >= 34) getSystemService(android.app.NotificationManager::class.java)?.canUseFullScreenIntent() ?: false else true
+
+    private fun openFullScreenSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= 34)
+            Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:$packageName"))
+        else Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+        try { startActivity(intent) } catch (_: Exception) { openAppSettings() }
+    }
+
+    /** Phone makers often stop closed apps from waking; this is where people allow it. */
+    private fun openBatterySettings() {
+        try { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } catch (_: Exception) { openAppSettings() }
+    }
+
+    private fun openAppSettings() {
+        try { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) } catch (_: Exception) {}
     }
 
     /**
