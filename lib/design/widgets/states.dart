@@ -252,6 +252,9 @@ void showToast(BuildContext context, String message, {IconData? icon, String? ac
       action: action == null ? null : SnackBarAction(label: action, onPressed: onAction ?? () {}),
       // Give people time to read and reach the button when there is one.
       duration: Duration(seconds: action == null ? 4 : 8),
+      // Flutter keeps a snackbar with an action (e.g. Undo) on screen until it
+      // is tapped; ours leave on their own after the duration above.
+      persist: false,
     ));
 }
 
