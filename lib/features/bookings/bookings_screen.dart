@@ -229,7 +229,7 @@ class BookingRow extends StatelessWidget {
               Row(children: [
                 Flexible(child: Text(b.counterparty(me).name, style: EvType.bodyStrong, overflow: TextOverflow.ellipsis)),
                 const SizedBox(width: 6),
-                if (b.source == BookingSource.now) const Icon(LucideIcons.zap, size: 13, color: EvColors.bronze),
+                if (b.source == BookingSource.now) Icon(LucideIcons.zap, size: 13, color: EvColors.bronze),
               ]),
               Text(b.items.map((i) => '${i.quantity} × ${i.description}').join(', '), style: EvType.small, maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 6),

@@ -219,7 +219,7 @@ class _EventEditorScreenState extends ConsumerState<EventEditorScreen> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(color: EvColors.infoTint, borderRadius: EvRadius.smAll),
                             child: Row(children: [
-                              const Icon(LucideIcons.calendarClock, size: 16, color: EvColors.info),
+                              Icon(LucideIcons.calendarClock, size: 16, color: EvColors.info),
                               const SizedBox(width: 8),
                               Expanded(child: Text('$_linkedTasks tasks and their reminders will move with the new date.', style: EvType.small.copyWith(color: EvColors.info))),
                             ]),

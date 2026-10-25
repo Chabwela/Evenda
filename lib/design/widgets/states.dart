@@ -123,8 +123,8 @@ class ErrorState extends StatelessWidget {
           Container(
             width: 52,
             height: 52,
-            decoration: const BoxDecoration(color: EvColors.dangerTint, shape: BoxShape.circle),
-            child: const Icon(LucideIcons.circleAlert, color: EvColors.danger),
+            decoration: BoxDecoration(color: EvColors.dangerTint, shape: BoxShape.circle),
+            child: Icon(LucideIcons.circleAlert, color: EvColors.danger),
           ),
           const SizedBox(height: EvSpace.x3),
           Text(e.isForbidden ? 'Not allowed' : 'Couldn’t load this', style: EvType.headline),
@@ -398,7 +398,7 @@ class _ConfettiPainter extends CustomPainter {
   _ConfettiPainter(this.t, this.bits);
   final double t;
   final List<(double angle, double reach, int colour)> bits;
-  static const _colours = [EvColors.forest, EvColors.bronze, EvColors.forestSoft, Color(0xFFC9A27A)];
+  static final _colours = [EvColors.forest, EvColors.bronze, EvColors.forestSoft, Color(0xFFC9A27A)];
 
   @override
   void paint(Canvas canvas, Size size) {

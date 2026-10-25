@@ -179,10 +179,10 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
                     color: EvColors.successTint,
                     onTap: () => context.push('/bookings/${q.bookingId}'),
                     child: Row(children: [
-                      const Icon(LucideIcons.circleCheck, color: EvColors.success),
+                      Icon(LucideIcons.circleCheck, color: EvColors.success),
                       const SizedBox(width: 10),
                       Expanded(child: Text('Booked. Open the booking to track preparation and payment.', style: EvType.bodyStrong.copyWith(color: EvColors.success))),
-                      const Icon(LucideIcons.chevronRight, color: EvColors.success),
+                      Icon(LucideIcons.chevronRight, color: EvColors.success),
                     ]),
                   ),
               ]),
@@ -308,7 +308,7 @@ class _QuotationCard extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(EvSpace.x4, EvSpace.x4, EvSpace.x2, EvSpace.x2),
             child: Row(children: [
-              const Icon(LucideIcons.fileText, size: 18, color: EvColors.forest),
+              Icon(LucideIcons.fileText, size: 18, color: EvColors.forest),
               const SizedBox(width: 8),
               Text('Quotation v${qt.version}', style: EvType.headline),
               const SizedBox(width: 8),
@@ -402,7 +402,7 @@ class _ActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(color: EvColors.warmWhite, border: Border(top: BorderSide(color: EvColors.sand))),
+      decoration: BoxDecoration(color: EvColors.warmWhite, border: Border(top: BorderSide(color: EvColors.sand))),
       padding: EdgeInsets.fromLTRB(EvSpace.x3, EvSpace.x2, EvSpace.x3, EvSpace.x2 + MediaQuery.paddingOf(context).bottom),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         if (asSupplier)

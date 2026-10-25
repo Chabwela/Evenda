@@ -340,7 +340,7 @@ class _NowLiveScreenState extends ConsumerState<NowLiveScreen> with TickerProvid
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(color: EvColors.warmWhite, borderRadius: EvRadius.mdAll, boxShadow: EvShadow.raised),
                   child: Row(children: [
-                    const Icon(LucideIcons.zap, size: 16, color: EvColors.bronze),
+                    Icon(LucideIcons.zap, size: 16, color: EvColors.bronze),
                     const SizedBox(width: 8),
                     Expanded(child: Text('${req.quantity} × ${req.itemDescription}', style: EvType.smallStrong, maxLines: 1, overflow: TextOverflow.ellipsis)),
                   ]),
@@ -422,7 +422,7 @@ class _NowLiveScreenState extends ConsumerState<NowLiveScreen> with TickerProvid
       snap: true,
       snapSizes: const [0.2, 0.42, 0.88],
       builder: (c, scroll) => Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: EvColors.warmWhite,
           borderRadius: BorderRadius.vertical(top: Radius.circular(EvRadius.lg)),
           boxShadow: EvShadow.floating,
@@ -646,7 +646,7 @@ class _RequestPin extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(color: EvColors.forest, shape: BoxShape.circle, border: Border.all(color: EvColors.warmWhite, width: 3), boxShadow: EvShadow.floating),
-          child: const Icon(LucideIcons.zap, color: EvColors.bronzeTint, size: 20),
+          child: Icon(LucideIcons.zap, color: EvColors.bronzeTint, size: 20),
         ),
         CustomPaint(size: const Size(14, 10), painter: _Pointer(EvColors.forest)),
         Container(width: 10, height: 4, decoration: BoxDecoration(color: EvColors.ink.withValues(alpha: 0.25), borderRadius: BorderRadius.circular(4))),
@@ -694,7 +694,7 @@ class _VendorMarker extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(color: selected || hasOffer ? EvColors.warmWhite.withValues(alpha: 0.18) : EvColors.forestTint, shape: BoxShape.circle),
                   child: selected
-                      ? const Icon(LucideIcons.check, size: 15, color: EvColors.inkOnDark)
+                      ? Icon(LucideIcons.check, size: 15, color: EvColors.inkOnDark)
                       : Text(initials, style: EvType.caption.copyWith(color: fg, fontWeight: FontWeight.w800, fontSize: 11)),
                 ),
                 if (hasOffer) ...[

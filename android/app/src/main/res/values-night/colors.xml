@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark mode canvas (EvPalette.darkPalette.cream); the start-up disc is cream. -->
+    <color name="evenda_cream">#111512</color>
+</resources>

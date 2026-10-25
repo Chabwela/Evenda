@@ -15,14 +15,14 @@ abstract final class EvType {
   static const _ui = 'Figtree';
   static const _display = 'Fraunces';
 
-  static TextStyle _f(double size, double height, int weight, {Color color = EvColors.ink, double tracking = 0}) =>
+  static TextStyle _f(double size, double height, int weight, {Color? color, double tracking = 0}) =>
       TextStyle(
         fontFamily: _ui,
         fontSize: size,
         height: height / size,
         fontWeight: FontWeight.values[(weight ~/ 100) - 1],
         fontVariations: [FontVariation.weight(weight.toDouble())],
-        color: color,
+        color: color ?? EvColors.ink,
         letterSpacing: tracking,
       );
 
@@ -40,27 +40,42 @@ abstract final class EvType {
         letterSpacing: -0.3,
       );
 
-  static final display = _d(28, 34, 560);
-  static final displaySm = _d(22, 28, 560);
-  static final title = _f(20, 26, 680, tracking: -0.2);
-  static final headline = _f(17, 22, 650, tracking: -0.1);
-  static final body = _f(15, 21, 440);
-  static final bodyStrong = _f(15, 21, 620);
-  static final small = _f(13, 18, 450, color: EvColors.ink2);
-  static final smallStrong = _f(13, 18, 620);
-  static final caption = _f(12, 16, 500, color: EvColors.ink3);
-  static final overline = _f(11, 14, 700, color: EvColors.ink3, tracking: 0.8);
-  static final label = _f(14, 18, 620);
-  static final number = _f(22, 26, 700, tracking: -0.4)
-      .copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
-  static final money = _f(15, 20, 680)
-      .copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
+  // Styles carry the palette's text colours: rebuilt when the palette changes.
+  static final _cache = <String, TextStyle>{};
+  static EvPalette? _cachedFor;
+  static TextStyle _s(String k, TextStyle Function() make) {
+    if (!identical(_cachedFor, EvColors.palette)) {
+      _cache.clear();
+      _cachedFor = EvColors.palette;
+    }
+    return _cache[k] ??= make();
+  }
+
+  static TextStyle get display => _s('display', () => _d(28, 34, 560));
+  static TextStyle get displaySm => _s('displaySm', () => _d(22, 28, 560));
+  static TextStyle get title => _s('title', () => _f(20, 26, 680, tracking: -0.2));
+  static TextStyle get headline => _s('headline', () => _f(17, 22, 650, tracking: -0.1));
+  static TextStyle get body => _s('body', () => _f(15, 21, 440));
+  static TextStyle get bodyStrong => _s('bodyStrong', () => _f(15, 21, 620));
+  static TextStyle get small => _s('small', () => _f(13, 18, 450, color: EvColors.ink2));
+  static TextStyle get smallStrong => _s('smallStrong', () => _f(13, 18, 620));
+  static TextStyle get caption => _s('caption', () => _f(12, 16, 500, color: EvColors.ink3));
+  static TextStyle get overline => _s('overline', () => _f(11, 14, 700, color: EvColors.ink3, tracking: 0.8));
+  static TextStyle get label => _s('label', () => _f(14, 18, 620));
+  static TextStyle get number => _s('number', () => _f(22, 26, 700, tracking: -0.4)
+      .copyWith(fontFeatures: const [FontFeature.tabularFigures()]));
+  static TextStyle get money => _s('money', () => _f(15, 20, 680)
+      .copyWith(fontFeatures: const [FontFeature.tabularFigures()]));
 }
 
 abstract final class EvTheme {
+  /// Status-bar icons that read on the current canvas.
+  static SystemUiOverlayStyle get statusBar =>
+      (EvColors.isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).copyWith(statusBarColor: Colors.transparent);
+
   static ThemeData light() {
-    const scheme = ColorScheme(
-      brightness: Brightness.light,
+    final scheme = ColorScheme(
+      brightness: EvColors.isDark ? Brightness.dark : Brightness.light,
       primary: EvColors.forest,
       onPrimary: EvColors.inkOnDark,
       primaryContainer: EvColors.forestTint,
@@ -108,7 +123,7 @@ abstract final class EvTheme {
 
     final inputBorder = OutlineInputBorder(
       borderRadius: EvRadius.smAll,
-      borderSide: const BorderSide(color: EvColors.sand),
+      borderSide: BorderSide(color: EvColors.sand),
     );
 
     return ThemeData(
@@ -137,9 +152,9 @@ abstract final class EvTheme {
         titleSpacing: EvSpace.gutter,
         toolbarHeight: 56,
         titleTextStyle: EvType.title,
-        systemOverlayStyle: SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
+        systemOverlayStyle: statusBar,
       ),
-      dividerTheme: const DividerThemeData(color: EvColors.hairline, thickness: 1, space: 1),
+      dividerTheme: DividerThemeData(color: EvColors.hairline, thickness: 1, space: 1),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: EvColors.warmWhite,
@@ -149,9 +164,9 @@ abstract final class EvTheme {
         floatingLabelBehavior: FloatingLabelBehavior.never,
         border: inputBorder,
         enabledBorder: inputBorder,
-        focusedBorder: inputBorder.copyWith(borderSide: const BorderSide(color: EvColors.forest, width: 1.6)),
-        errorBorder: inputBorder.copyWith(borderSide: const BorderSide(color: EvColors.danger)),
-        focusedErrorBorder: inputBorder.copyWith(borderSide: const BorderSide(color: EvColors.danger, width: 1.6)),
+        focusedBorder: inputBorder.copyWith(borderSide: BorderSide(color: EvColors.forest, width: 1.6)),
+        errorBorder: inputBorder.copyWith(borderSide: BorderSide(color: EvColors.danger)),
+        focusedErrorBorder: inputBorder.copyWith(borderSide: BorderSide(color: EvColors.danger, width: 1.6)),
         errorStyle: EvType.caption.copyWith(color: EvColors.danger),
         helperStyle: EvType.caption,
       ),
@@ -176,23 +191,23 @@ abstract final class EvTheme {
       ),
       checkboxTheme: CheckboxThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-        side: const BorderSide(color: EvColors.sandDeep, width: 1.6),
+        side: BorderSide(color: EvColors.sandDeep, width: 1.6),
         fillColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? EvColors.forest : null),
       ),
       switchTheme: SwitchThemeData(
         trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
-        thumbColor: const WidgetStatePropertyAll(EvColors.warmWhite),
+        thumbColor: WidgetStatePropertyAll(EvColors.warmWhite),
         trackColor: WidgetStateProperty.resolveWith(
             (s) => s.contains(WidgetState.selected) ? EvColors.forest : EvColors.sandDeep),
       ),
-      sliderTheme: const SliderThemeData(
+      sliderTheme: SliderThemeData(
         activeTrackColor: EvColors.forest,
         inactiveTrackColor: EvColors.sand,
         thumbColor: EvColors.forest,
         overlayColor: Color(0x221B3B22),
         trackHeight: 4,
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: EvColors.warmWhite,
         surfaceTintColor: Colors.transparent,
         modalBarrierColor: EvColors.scrim,
@@ -220,14 +235,14 @@ abstract final class EvTheme {
         surfaceTintColor: Colors.transparent,
         headerBackgroundColor: EvColors.forest,
         headerForegroundColor: EvColors.inkOnDark,
-        todayBorder: const BorderSide(color: EvColors.bronze),
+        todayBorder: BorderSide(color: EvColors.bronze),
         shape: RoundedRectangleBorder(borderRadius: EvRadius.mdAll),
       ),
       timePickerTheme: TimePickerThemeData(
         backgroundColor: EvColors.warmWhite,
         shape: RoundedRectangleBorder(borderRadius: EvRadius.mdAll),
       ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(color: EvColors.forest, linearTrackColor: EvColors.sand),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: EvColors.forest, linearTrackColor: EvColors.sand),
       tooltipTheme: TooltipThemeData(
         decoration: BoxDecoration(color: EvColors.ink, borderRadius: EvRadius.smAll),
         textStyle: EvType.caption.copyWith(color: EvColors.inkOnDark),

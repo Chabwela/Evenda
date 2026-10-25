@@ -46,10 +46,10 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
   @override
   Widget build(BuildContext context) {
     final check = ref.watch(_checkProvider);
-    Widget point(IconData icon, String text, {Color color = EvColors.ink2}) => Padding(
+    Widget point(IconData icon, String text, {Color? color}) => Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(icon, size: 18, color: color),
+            Icon(icon, size: 18, color: color ?? EvColors.ink2),
             const SizedBox(width: 10),
             Expanded(child: Text(text, style: EvType.small)),
           ]),

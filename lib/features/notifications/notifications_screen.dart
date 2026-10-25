@@ -180,7 +180,7 @@ class _NotificationRow extends StatelessWidget {
               Text('${n.category.label} · ${EvDates.ago(n.createdAt)}', style: EvType.caption),
             ]),
           ),
-          if (n.unread) Container(margin: const EdgeInsets.only(top: 6, left: 8), width: 8, height: 8, decoration: const BoxDecoration(color: EvColors.bronze, shape: BoxShape.circle)),
+          if (n.unread) Container(margin: const EdgeInsets.only(top: 6, left: 8), width: 8, height: 8, decoration: BoxDecoration(color: EvColors.bronze, shape: BoxShape.circle)),
         ]),
       ),
     );
@@ -200,7 +200,7 @@ class _QuietHoursLine extends ConsumerWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, 0),
         child: Row(children: [
-          const Icon(LucideIcons.moon, size: 16, color: EvColors.ink3),
+          Icon(LucideIcons.moon, size: 16, color: EvColors.ink3),
           const SizedBox(width: 8),
           Expanded(
             child: Text('Quiet hours: pop-ups are paused until ${EvDates.time(until)}. Evenda Now still alerts you.',

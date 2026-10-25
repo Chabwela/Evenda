@@ -56,7 +56,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
                     autofillHints: const [AutofillHints.password],
                     onSubmitted: (_) => _signIn(),
                     decoration: InputDecoration(
-                      prefixIcon: const Icon(LucideIcons.keyRound, size: 18, color: EvColors.ink3),
+                      prefixIcon: Icon(LucideIcons.keyRound, size: 18, color: EvColors.ink3),
                       suffixIcon: IconButton(icon: Icon(_obscure ? LucideIcons.eye : LucideIcons.eyeOff, size: 18), onPressed: () => setState(() => _obscure = !_obscure)),
                     ),
                   ),

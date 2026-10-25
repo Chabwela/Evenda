@@ -92,13 +92,13 @@ class _IncomingRequestScreenState extends ConsumerState<IncomingRequestScreen>
     final item = ref.watch(_incomingProvider(widget.id));
     final v = item.value;
     final r = v?.request;
-    const cream = EvColors.cream;
+    final cream = EvBrand.cream;
     const soft = Color(0xFFC9A27A); // light bronze on forest
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: EvColors.forest,
+        backgroundColor: EvBrand.forest,
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -166,14 +166,14 @@ class _IncomingRequestScreenState extends ConsumerState<IncomingRequestScreen>
                             child: Container(
                               padding: const EdgeInsets.all(7),
                               decoration: BoxDecoration(
-                                color: EvColors.bronze,
+                                color: EvBrand.bronze,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: EvColors.forest,
+                                  color: EvBrand.forest,
                                   width: 3,
                                 ),
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 LucideIcons.zap,
                                 size: 16,
                                 color: cream,
@@ -246,7 +246,7 @@ class _IncomingRequestScreenState extends ConsumerState<IncomingRequestScreen>
                     ),
                   ),
                 ] else if (item.isLoading)
-                  const SizedBox(
+                  SizedBox(
                     height: 24,
                     width: 24,
                     child: CircularProgressIndicator(
@@ -276,7 +276,7 @@ class _IncomingRequestScreenState extends ConsumerState<IncomingRequestScreen>
                     _RoundAction(
                       label: 'Make an offer',
                       icon: LucideIcons.zap,
-                      fill: EvColors.bronze,
+                      fill: EvBrand.bronze,
                       ink: cream,
                       onTap: r == null ? null : _offer,
                     ),
@@ -363,7 +363,7 @@ class _Ripples extends CustomPainter {
       canvas.drawCircle(
         c,
         r,
-        Paint()..color = EvColors.cream.withValues(alpha: math.max(0, a)),
+        Paint()..color = EvBrand.cream.withValues(alpha: math.max(0, a)),
       );
     }
   }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../app/appearance.dart';
 import '../../app/providers.dart';
 import '../../app/shell.dart';
 import '../../core/format.dart';
@@ -78,12 +79,12 @@ class BusinessScreen extends ConsumerWidget {
                       style: EvType.small, maxLines: 1, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 2),
                   Row(children: [
-                    if (biz.verified) const Padding(padding: EdgeInsets.only(right: 4), child: Icon(LucideIcons.badgeCheck, size: 14, color: EvColors.forest)),
+                    if (biz.verified) Padding(padding: EdgeInsets.only(right: 4), child: Icon(LucideIcons.badgeCheck, size: 14, color: EvColors.forest)),
                     Text(verifiedText, style: EvType.caption.copyWith(color: biz.verified ? EvColors.forest : EvColors.ink3, fontWeight: FontWeight.w600)),
                   ]),
                 ]),
               ),
-              const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
+              Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
             ]),
           ),
         ),
@@ -117,7 +118,7 @@ class BusinessScreen extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, 0),
               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Icon(LucideIcons.triangleAlert, size: 16, color: EvColors.danger),
+                Icon(LucideIcons.triangleAlert, size: 16, color: EvColors.danger),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text('${b.reference}: ${Money.k(b.confirmedPaid)} confirmed against a ${Money.k(b.total)} booking. Check the payment record →',
@@ -155,6 +156,19 @@ class BusinessScreen extends ConsumerWidget {
           EvRow(title: 'Business profile', subtitle: 'Logo, contacts, location, hours', trailing: const _Trail(), onTap: () => context.push('/business/profile')),
           EvRow(title: 'Team', subtitle: 'Who can quote, book and manage stock', trailing: const _Trail(), onTap: () => context.push('/business/team')),
           EvRow(title: 'Notifications', subtitle: 'Supplier updates, reminders, quiet hours', trailing: const _Trail(), onTap: () => context.push('/business/notifications')),
+          EvRow(
+            title: 'Appearance',
+            subtitle: ref.watch(appearanceProvider).label,
+            trailing: const _Trail(),
+            onTap: () async {
+              final a = await pickFromSheet<Appearance>(context, title: 'Appearance', selected: ref.read(appearanceProvider), options: [
+                (Appearance.system, Appearance.system.label, 'Light or dark, as your phone is set'),
+                (Appearance.light, Appearance.light.label, null),
+                (Appearance.dark, Appearance.dark.label, 'Easier on the eyes at night'),
+              ]);
+              if (a != null) ref.read(appearanceProvider.notifier).set(a);
+            },
+          ),
           EvRow(title: 'Account & privacy', subtitle: 'Your data and account options', trailing: const _Trail(), onTap: () => context.push('/business/account')),
         ]),
 
@@ -194,6 +208,6 @@ class _Trail extends StatelessWidget {
           Text(note!, style: EvType.caption.copyWith(color: alert ? EvColors.warning : EvColors.ink2, fontWeight: FontWeight.w600)),
           const SizedBox(width: 4),
         ],
-        const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
+        Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
       ]);
 }

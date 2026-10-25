@@ -14,16 +14,30 @@ import '../tokens.dart';
 /// Semantic tones. Every status in the product maps to exactly one tone, so
 /// the same colour always means the same thing.
 enum Tone {
-  neutral(EvColors.neutralTint, EvColors.ink2),
-  waiting(EvColors.bronzeTint, EvColors.bronzeDeep), // awaiting someone's action
-  progress(EvColors.infoTint, EvColors.info), // underway
-  positive(EvColors.successTint, EvColors.success), // confirmed / done
-  attention(EvColors.warningTint, EvColors.warning), // needs your attention
-  critical(EvColors.dangerTint, EvColors.danger); // failed / cancelled / overdue
+  neutral, // nothing pending
+  waiting, // awaiting someone's action
+  progress, // underway
+  positive, // confirmed / done
+  attention, // needs your attention
+  critical; // failed / cancelled / overdue
 
-  const Tone(this.bg, this.fg);
-  final Color bg;
-  final Color fg;
+  /// Read from the active palette, so tones follow light and dark mode.
+  Color get bg => switch (this) {
+        neutral => EvColors.neutralTint,
+        waiting => EvColors.bronzeTint,
+        progress => EvColors.infoTint,
+        positive => EvColors.successTint,
+        attention => EvColors.warningTint,
+        critical => EvColors.dangerTint,
+      };
+  Color get fg => switch (this) {
+        neutral => EvColors.ink2,
+        waiting => EvColors.bronzeDeep,
+        progress => EvColors.info,
+        positive => EvColors.success,
+        attention => EvColors.warning,
+        critical => EvColors.danger,
+      };
 }
 
 Tone toneForBooking(BookingStatus s) => switch (s) {
@@ -121,7 +135,7 @@ class DemoBadge extends StatelessWidget {
           border: Border.all(color: EvColors.bronze.withValues(alpha: 0.35)),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(LucideIcons.flaskConical, size: 12, color: EvColors.bronzeDeep),
+          Icon(LucideIcons.flaskConical, size: 12, color: EvColors.bronzeDeep),
           const SizedBox(width: 4),
           Text(label, style: EvType.caption.copyWith(color: EvColors.bronzeDeep, fontWeight: FontWeight.w700)),
         ]),
@@ -230,7 +244,7 @@ class EvSurface extends StatelessWidget {
       padding: margin ?? EdgeInsets.zero,
       child: Material(
         color: color ?? EvColors.warmWhite,
-        shape: RoundedRectangleBorder(borderRadius: r, side: const BorderSide(color: EvColors.hairline)),
+        shape: RoundedRectangleBorder(borderRadius: r, side: BorderSide(color: EvColors.hairline)),
         clipBehavior: Clip.antiAlias,
         child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
       ),
@@ -280,7 +294,7 @@ class EvRow extends StatelessWidget {
             ]),
           ),
           if (trailing != null) ...[const SizedBox(width: 10), trailing!],
-          if (trailing == null && onTap != null) const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
+          if (trailing == null && onTap != null) Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
         ]),
       ),
     );
@@ -386,7 +400,7 @@ class BusinessAvatar extends StatelessWidget {
   final double size;
   final bool verified;
 
-  static const _tints = [
+  static final _tints = [
     (EvColors.forestTint, EvColors.forest),
     (EvColors.bronzeTint, EvColors.bronzeDeep),
     (EvColors.infoTint, EvColors.info),
@@ -415,7 +429,7 @@ class BusinessAvatar extends StatelessWidget {
         bottom: -3,
         child: Container(
           padding: const EdgeInsets.all(1.5),
-          decoration: const BoxDecoration(color: EvColors.cream, shape: BoxShape.circle),
+          decoration: BoxDecoration(color: EvColors.cream, shape: BoxShape.circle),
           child: Icon(LucideIcons.badgeCheck, size: size * 0.36, color: EvColors.forest),
         ),
       ),
@@ -521,7 +535,7 @@ Future<T?> pickFromSheet<T>(BuildContext context, {required String title, requir
             title: label,
             subtitle: sub,
             leading: icon?.call(v) == null ? null : IconTile(icon!(v)!, tone: v == selected ? Tone.positive : Tone.neutral),
-            trailing: v == selected ? const Icon(LucideIcons.check, color: EvColors.forest, size: 20) : const SizedBox(width: 20),
+            trailing: v == selected ? Icon(LucideIcons.check, color: EvColors.forest, size: 20) : const SizedBox(width: 20),
             onTap: () => Navigator.pop(c, v),
           ),
       ],

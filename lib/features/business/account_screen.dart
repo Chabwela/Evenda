@@ -53,7 +53,7 @@ class AccountScreen extends ConsumerWidget {
               EvRow(
                                 title: 'Privacy policy',
                 subtitle: 'The full details',
-                trailing: const Icon(LucideIcons.externalLink, size: 18, color: EvColors.ink3),
+                trailing: Icon(LucideIcons.externalLink, size: 18, color: EvColors.ink3),
                 onTap: () => launchUrl(Uri.parse(AppConfig.privacyPolicyUrl), mode: LaunchMode.externalApplication),
               ),
               const EvDivider(indent: 64),
@@ -61,14 +61,14 @@ class AccountScreen extends ConsumerWidget {
             EvRow(
               title: 'Location privacy',
               subtitle: 'Exact or approximate pin for other vendors',
-              trailing: const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
+              trailing: Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
               onTap: () => context.push('/business/profile'),
             ),
             const EvDivider(indent: 64),
             EvRow(
               title: 'Notifications',
               subtitle: 'Choose what reaches your phone',
-              trailing: const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
+              trailing: Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
               onTap: () => context.push('/business/notifications'),
             ),
           ]),

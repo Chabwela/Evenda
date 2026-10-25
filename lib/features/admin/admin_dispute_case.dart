@@ -243,7 +243,7 @@ class _RulingBar extends ConsumerWidget {
     }
 
     return Container(
-      decoration: const BoxDecoration(color: EvColors.cream, border: Border(top: BorderSide(color: EvColors.hairline))),
+      decoration: BoxDecoration(color: EvColors.cream, border: Border(top: BorderSide(color: EvColors.hairline))),
       padding: EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, EvSpace.x3 + MediaQuery.paddingOf(context).bottom),
       child: Row(children: [
         if (d.status == 'open') ...[

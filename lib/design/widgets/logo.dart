@@ -8,10 +8,11 @@ import '../tokens.dart';
 /// icon (tool/icon/evenda_icon.mjs, assets/brand/evenda_mark.svg): an "e" cut
 /// out of a disc, forest above the aperture and bronze below it.
 class EvendaMark extends StatefulWidget {
-  const EvendaMark({super.key, this.size = 48, this.animate = false, this.onDark = false});
+  const EvendaMark({super.key, this.size = 48, this.animate = false, this.onDark});
   final double size;
   final bool animate;
-  final bool onDark;
+  /// Cream and light bronze, for dark grounds. Defaults to dark mode.
+  final bool? onDark;
 
   /// Length of the launch animation (the launch screen waits for it).
   static const introDuration = Duration(milliseconds: 1300);
@@ -44,7 +45,7 @@ class _EvendaMarkState extends State<EvendaMark> with SingleTickerProviderStateM
         label: 'Evenda',
         child: AnimatedBuilder(
           animation: _c,
-          builder: (_, _) => CustomPaint(size: Size.square(widget.size), painter: _MarkPainter(_c.value, widget.onDark)),
+          builder: (_, _) => CustomPaint(size: Size.square(widget.size), painter: _MarkPainter(_c.value, widget.onDark ?? EvColors.isDark)),
         ),
       );
 }
@@ -87,8 +88,8 @@ class _MarkPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.scale(size.width / 120);
-    final main = onDark ? EvColors.cream : EvColors.forest;
-    final accent = onDark ? const Color(0xFFC9A27A) : EvColors.bronze;
+    final main = onDark ? EvBrand.cream : EvBrand.forest;
+    final accent = onDark ? EvBrand.bronzeLight : EvBrand.bronze;
     const split = 60 + _y1 + _slot; // bronze below the aperture
 
     // Starts as the plain disc the native splash shows, so the hand-off is
@@ -110,16 +111,17 @@ class _MarkPainter extends CustomPainter {
 
 /// Mark + wordmark. The wordmark stays one colour; the mark carries the bronze.
 class EvendaLogo extends StatelessWidget {
-  const EvendaLogo({super.key, this.size = 28, this.onDark = false});
+  const EvendaLogo({super.key, this.size = 28, this.onDark});
   final double size;
-  final bool onDark;
+  final bool? onDark;
 
   @override
   Widget build(BuildContext context) {
-    final main = onDark ? EvColors.cream : EvColors.forest;
+    final dark = onDark ?? EvColors.isDark;
+    final main = dark ? EvBrand.cream : EvBrand.forest;
     final style = EvType.title.copyWith(fontSize: size * 0.82, color: main, letterSpacing: 0.2, fontWeight: FontWeight.w600);
     return Row(mainAxisSize: MainAxisSize.min, children: [
-      EvendaMark(size: size, onDark: onDark),
+      EvendaMark(size: size, onDark: dark),
       SizedBox(width: size * 0.3),
       Text('evenda', style: style),
     ]);

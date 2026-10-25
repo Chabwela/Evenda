@@ -72,7 +72,7 @@ class _NowRespondScreenState extends ConsumerState<NowRespondScreen> {
     final data = ref.watch(_inboxItemProvider(widget.id));
     return Scaffold(
       appBar: AppBar(title: Row(children: [
-        const Icon(LucideIcons.zap, size: 18, color: EvColors.bronze),
+        Icon(LucideIcons.zap, size: 18, color: EvColors.bronze),
         const SizedBox(width: 6),
         Text('Urgent request', style: EvType.title),
       ])),
@@ -120,7 +120,7 @@ class _NowRespondScreenState extends ConsumerState<NowRespondScreen> {
                   children: [
                     ...evTileLayers(),
                     MarkerLayer(markers: [
-                      Marker(point: r.location, width: 36, height: 36, child: const Icon(LucideIcons.mapPin, color: EvColors.forest, size: 34, fill: 1)),
+                      Marker(point: r.location, width: 36, height: 36, child: Icon(LucideIcons.mapPin, color: EvColors.forest, size: 34, fill: 1)),
                     ]),
                     evAttribution(),
                   ],

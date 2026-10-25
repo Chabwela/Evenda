@@ -102,7 +102,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(LucideIcons.triangleAlert, color: EvColors.warning, size: 20),
+                        Icon(LucideIcons.triangleAlert, color: EvColors.warning, size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
@@ -467,7 +467,7 @@ class _StockCard extends ConsumerWidget {
                     ),
                   ),
                   Text(l.status == ListingStatus.published ? 'Edit listing' : 'List it', style: EvType.smallStrong.copyWith(color: EvColors.forest)),
-                  const Icon(LucideIcons.chevronRight, size: 16, color: EvColors.forest),
+                  Icon(LucideIcons.chevronRight, size: 16, color: EvColors.forest),
                 ],
               ),
             ),

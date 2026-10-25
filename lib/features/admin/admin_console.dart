@@ -109,8 +109,8 @@ class _AdminConsoleScreenState extends ConsumerState<AdminConsoleScreen> {
             onDestinationSelected: (i) => setState(() => _s = sections[i]),
             indicatorColor: EvColors.forestTint,
             leading: const Padding(padding: EdgeInsets.symmetric(vertical: EvSpace.x5), child: EvendaMark(size: 34)),
-            selectedIconTheme: const IconThemeData(color: EvColors.forest),
-            unselectedIconTheme: const IconThemeData(color: EvColors.ink3),
+            selectedIconTheme: IconThemeData(color: EvColors.forest),
+            unselectedIconTheme: IconThemeData(color: EvColors.ink3),
             selectedLabelTextStyle: EvType.smallStrong.copyWith(color: EvColors.forest),
             unselectedLabelTextStyle: EvType.small.copyWith(color: EvColors.ink2),
             destinations: [for (final s in sections) NavigationRailDestination(icon: Icon(s.icon), label: Text(s.label))],
@@ -270,8 +270,8 @@ class _QueueRow extends StatelessWidget {
               child: Text('${q.count}', textAlign: TextAlign.center, style: EvType.smallStrong.copyWith(color: EvColors.inkOnDark)),
             )
           else
-            const Icon(LucideIcons.circleCheck, size: 18, color: EvColors.success),
-          if (onTap != null) ...[const SizedBox(width: 6), const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3)],
+            Icon(LucideIcons.circleCheck, size: 18, color: EvColors.success),
+          if (onTap != null) ...[const SizedBox(width: 6), Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3)],
         ]),
       ),
     );
@@ -337,7 +337,7 @@ class _BusinessesState extends ConsumerState<_Businesses> {
                   ]),
                   // Decisions happen on the review screen, after the documents
                   // have been opened; the list no longer offers blind verify.
-                  trailing: const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
+                  trailing: Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
                   onTap: () async {
                     await context.push('/admin/business/${b.id}');
                     if (mounted) setState(() {});
@@ -565,7 +565,7 @@ class _NowCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: EvRadius.lgAll,
-          border: r.status.live ? const Border(left: BorderSide(color: EvColors.bronze, width: 4)) : null,
+          border: r.status.live ? Border(left: BorderSide(color: EvColors.bronze, width: 4)) : null,
         ),
         padding: const EdgeInsets.all(EvSpace.x3),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -670,7 +670,7 @@ class _NowFile extends ConsumerWidget {
                   ),
                 ]),
                 MarkerLayer(markers: [
-                  Marker(point: r.location, width: 36, height: 36, child: const Icon(LucideIcons.mapPin, size: 32, color: EvColors.forest, fill: 1)),
+                  Marker(point: r.location, width: 36, height: 36, child: Icon(LucideIcons.mapPin, size: 32, color: EvColors.forest, fill: 1)),
                 ]),
               ],
             ),
@@ -783,7 +783,7 @@ class _NowFile extends ConsumerWidget {
             color: EvColors.dangerTint,
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Row(children: [
-                const Icon(LucideIcons.shieldAlert, size: 18, color: EvColors.danger),
+                Icon(LucideIcons.shieldAlert, size: 18, color: EvColors.danger),
                 const SizedBox(width: 8),
                 Text('Platform intervention', style: EvType.smallStrong.copyWith(color: EvColors.danger)),
               ]),
@@ -925,7 +925,7 @@ class _BookingsState extends ConsumerState<_Bookings> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, 0),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Icon(LucideIcons.triangleAlert, size: 16, color: EvColors.danger),
+                  Icon(LucideIcons.triangleAlert, size: 16, color: EvColors.danger),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -975,7 +975,7 @@ class _AdminBookingCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: EvRadius.lgAll,
-          border: alert ? const Border(left: BorderSide(color: EvColors.danger, width: 4)) : null,
+          border: alert ? Border(left: BorderSide(color: EvColors.danger, width: 4)) : null,
         ),
         padding: const EdgeInsets.all(EvSpace.x3),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -992,12 +992,12 @@ class _AdminBookingCard extends StatelessWidget {
           // Who supplies whom.
           Row(children: [
             Expanded(child: _Party(b.supplier, 'Supplier')),
-            const Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Icon(LucideIcons.arrowRight, size: 16, color: EvColors.ink3)),
+            Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Icon(LucideIcons.arrowRight, size: 16, color: EvColors.ink3)),
             Expanded(child: _Party(b.requester, 'Hired by')),
           ]),
           const SizedBox(height: EvSpace.x3),
           Row(children: [
-            const Icon(LucideIcons.calendarDays, size: 14, color: EvColors.ink3),
+            Icon(LucideIcons.calendarDays, size: 14, color: EvColors.ink3),
             const SizedBox(width: 6),
             Expanded(child: Text(EvDates.range(b.startsOn, b.endsOn), style: EvType.small)),
             Text(Money.k(b.total), style: EvType.money),
@@ -1210,7 +1210,7 @@ class _BookingFile extends ConsumerWidget {
             color: EvColors.dangerTint,
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Row(children: [
-                const Icon(LucideIcons.shieldAlert, size: 18, color: EvColors.danger),
+                Icon(LucideIcons.shieldAlert, size: 18, color: EvColors.danger),
                 const SizedBox(width: 8),
                 Text('Platform intervention', style: EvType.smallStrong.copyWith(color: EvColors.danger)),
               ]),
@@ -1409,7 +1409,7 @@ class _CategoryCard extends StatelessWidget {
           ),
           if (!c.active) const StatusPill('Hidden', tone: Tone.neutral, dense: true, icon: LucideIcons.eyeOff),
           const SizedBox(width: 4),
-          const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
+          Icon(LucideIcons.chevronRight, size: 18, color: EvColors.ink3),
         ]),
       ),
     );

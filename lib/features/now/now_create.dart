@@ -157,7 +157,7 @@ class _NowCreateScreenState extends ConsumerState<NowCreateScreen> {
         EvField(label: 'Anything else', controller: _notes, hint: 'Colour, condition, setup needed…', maxLines: 3, minLines: 2, optional: true),
         const SizedBox(height: EvSpace.x3),
         Row(children: [
-          const Icon(LucideIcons.shieldCheck, size: 14, color: EvColors.ink3),
+          Icon(LucideIcons.shieldCheck, size: 14, color: EvColors.ink3),
           const SizedBox(width: 6),
           Expanded(
             child: Text('Only suppliers with this free on your date are alerted. They see your location note and distance, not your exact address.', style: EvType.caption),

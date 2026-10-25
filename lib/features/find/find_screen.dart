@@ -149,7 +149,7 @@ class _FindScreenState extends ConsumerState<FindScreen> {
         actions: [
           TextButton.icon(
             onPressed: () => context.push('/now'),
-            icon: const Icon(LucideIcons.zap, size: 16, color: EvColors.bronze),
+            icon: Icon(LucideIcons.zap, size: 16, color: EvColors.bronze),
             label: Text('Urgent', style: EvType.smallStrong.copyWith(color: EvColors.bronzeDeep)),
           ),
         ],
@@ -164,7 +164,7 @@ class _FindScreenState extends ConsumerState<FindScreen> {
             onSubmitted: (v) => _set(_q.copyWith(text: v)),
             decoration: InputDecoration(
               hintText: 'Chairs, marquees, PA systems, suppliers…',
-              prefixIcon: const Icon(LucideIcons.search, size: 18, color: EvColors.ink3),
+              prefixIcon: Icon(LucideIcons.search, size: 18, color: EvColors.ink3),
               suffixIcon: _text.text.isEmpty
                   ? null
                   : IconButton(icon: const Icon(LucideIcons.x, size: 18), onPressed: () {
@@ -199,7 +199,7 @@ class _FindScreenState extends ConsumerState<FindScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.gutter, 0),
             child: Row(children: [
-              const Icon(LucideIcons.info, size: 13, color: EvColors.ink3),
+              Icon(LucideIcons.info, size: 13, color: EvColors.ink3),
               const SizedBox(width: 6),
               Expanded(child: Text('Free quantities are live from each supplier’s calendar. Stock is held only when a quotation is accepted.', style: EvType.caption)),
             ]),

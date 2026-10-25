@@ -543,7 +543,7 @@ class EvOptionTile extends StatelessWidget {
                 color: selected ? EvColors.forest : Colors.transparent,
                 border: Border.all(color: selected ? EvColors.forest : EvColors.sandDeep, width: 1.6),
               ),
-              child: selected ? const Icon(LucideIcons.check, size: 14, color: EvColors.inkOnDark) : null,
+              child: selected ? Icon(LucideIcons.check, size: 14, color: EvColors.inkOnDark) : null,
             ),
           ]),
         ),

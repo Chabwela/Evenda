@@ -242,7 +242,7 @@ class _BodyState extends ConsumerState<_Body> {
                             child: const Text('Void'),
                           )
                         : p.confirmedAt != null
-                    ? const Icon(LucideIcons.circleCheck, size: 18, color: EvColors.success)
+                    ? Icon(LucideIcons.circleCheck, size: 18, color: EvColors.success)
                     : p.recordedByBusinessId != me
                         ? EvButton('Confirm', compact: true, kind: EvButtonKind.secondary,
                             onPressed: () => guard(context, () => ref.read(backendProvider).bookings.confirmPayment(p.id), success: 'Payment confirmed'))
@@ -334,7 +334,7 @@ class _Stepper extends StatelessWidget {
               color: i <= idx ? EvColors.forest : EvColors.warmWhite,
               border: Border.all(color: i <= idx ? EvColors.forest : EvColors.sandDeep, width: 2),
             ),
-            child: i < idx ? const Icon(LucideIcons.check, size: 10, color: EvColors.inkOnDark) : null,
+            child: i < idx ? Icon(LucideIcons.check, size: 10, color: EvColors.inkOnDark) : null,
           ),
           const SizedBox(height: 6),
           Text(steps[i].$2, style: EvType.caption.copyWith(color: i <= idx ? EvColors.forest : EvColors.ink3, fontWeight: i == idx ? FontWeight.w700 : FontWeight.w500)),

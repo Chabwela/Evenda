@@ -1,4 +1,4 @@
-/// Request a quotation lays out on a 360 dp phone at large text without
+// Request a quotation lays out on a 360 dp phone at large text without
 /// squeezing item names, and shows what listed prices come to.
 import 'package:evenda/app/providers.dart';
 import 'package:evenda/core/connectivity.dart';

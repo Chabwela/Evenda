@@ -281,7 +281,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(color: EvColors.forest, shape: BoxShape.circle, border: Border.all(color: EvColors.cream, width: 2)),
-                    child: const Icon(LucideIcons.camera, size: 13, color: EvColors.inkOnDark),
+                    child: Icon(LucideIcons.camera, size: 13, color: EvColors.inkOnDark),
                   ),
                 ),
               ]),

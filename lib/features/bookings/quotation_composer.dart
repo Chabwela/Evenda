@@ -205,7 +205,7 @@ class _QuotationComposerScreenState extends ConsumerState<QuotationComposerScree
       ),
       bottomSheet: data.hasValue
           ? Container(
-              decoration: const BoxDecoration(color: EvColors.warmWhite, border: Border(top: BorderSide(color: EvColors.sand))),
+              decoration: BoxDecoration(color: EvColors.warmWhite, border: Border(top: BorderSide(color: EvColors.sand))),
               padding: EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, EvSpace.x3 + MediaQuery.paddingOf(context).bottom),
               child: Row(children: [
                 Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
@@ -246,7 +246,7 @@ class _LineEditor extends StatelessWidget {
               },
             ),
           ),
-          if (onRemove != null) IconButton(icon: const Icon(LucideIcons.x, size: 18, color: EvColors.ink3), onPressed: onRemove, visualDensity: VisualDensity.compact),
+          if (onRemove != null) IconButton(icon: Icon(LucideIcons.x, size: 18, color: EvColors.ink3), onPressed: onRemove, visualDensity: VisualDensity.compact),
         ]),
         const SizedBox(height: 8),
         Row(children: [

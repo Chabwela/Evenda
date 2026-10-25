@@ -234,7 +234,7 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
                     child: _uploading
                         ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
                         : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                            const Icon(LucideIcons.imagePlus, color: EvColors.forest),
+                            Icon(LucideIcons.imagePlus, color: EvColors.forest),
                             const SizedBox(height: 4),
                             Text('Add', style: EvType.caption.copyWith(color: EvColors.forest)),
                           ]),
@@ -267,7 +267,7 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
                             onTap: () => setState(() => d.photos = [...d.photos]..removeAt(i)),
                             child: Container(
                               padding: const EdgeInsets.all(3),
-                              decoration: const BoxDecoration(color: EvColors.warmWhite, shape: BoxShape.circle),
+                              decoration: BoxDecoration(color: EvColors.warmWhite, shape: BoxShape.circle),
                               child: const Icon(LucideIcons.x, size: 13),
                             ),
                           ),
@@ -394,7 +394,7 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
         ]),
       ),
       bottomSheet: Container(
-        decoration: const BoxDecoration(color: EvColors.warmWhite, border: Border(top: BorderSide(color: EvColors.sand))),
+        decoration: BoxDecoration(color: EvColors.warmWhite, border: Border(top: BorderSide(color: EvColors.sand))),
         padding: EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, EvSpace.x3 + MediaQuery.paddingOf(context).bottom),
         child: _mode == ListingEditorMode.item
             // Stock item: saving never changes whether it is on the marketplace.
@@ -444,7 +444,7 @@ class _ItemSummary extends StatelessWidget {
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            const Icon(LucideIcons.pencil, size: 14, color: EvColors.forest),
+            Icon(LucideIcons.pencil, size: 14, color: EvColors.forest),
             const SizedBox(width: 6),
             Text('Edit photos & item details in My stock', style: EvType.smallStrong.copyWith(color: EvColors.forest)),
           ]),

@@ -52,7 +52,7 @@ class InventoryUpdateCard extends StatelessWidget {
           const SizedBox(height: 2),
           Row(children: [
             Flexible(child: Text(update.supplier.name, style: EvType.small, maxLines: 1, overflow: TextOverflow.ellipsis)),
-            if (update.supplier.verified) ...[const SizedBox(width: 4), const Icon(LucideIcons.badgeCheck, size: 13, color: EvColors.forest)],
+            if (update.supplier.verified) ...[const SizedBox(width: 4), Icon(LucideIcons.badgeCheck, size: 13, color: EvColors.forest)],
           ]),
           const SizedBox(height: 2),
           Text(
@@ -102,7 +102,7 @@ class ListingResultCard extends StatelessWidget {
                 if (biz != null)
                   Row(children: [
                     Flexible(child: Text(biz.name, style: EvType.small, maxLines: 1, overflow: TextOverflow.ellipsis)),
-                    if (biz.verified) ...[const SizedBox(width: 4), const Icon(LucideIcons.badgeCheck, size: 13, color: EvColors.forest)],
+                    if (biz.verified) ...[const SizedBox(width: 4), Icon(LucideIcons.badgeCheck, size: 13, color: EvColors.forest)],
                   ]),
                 const SizedBox(height: 8),
                 Row(children: [

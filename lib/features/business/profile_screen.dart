@@ -38,7 +38,7 @@ class _WhatToFix extends ConsumerWidget {
       padding: const EdgeInsets.only(top: EvSpace.x5),
       child: Container(
         padding: const EdgeInsets.fromLTRB(EvSpace.x4, EvSpace.x3, EvSpace.x4, EvSpace.x3),
-        decoration: const BoxDecoration(border: Border(left: BorderSide(color: EvColors.danger, width: 3))),
+        decoration: BoxDecoration(border: Border(left: BorderSide(color: EvColors.danger, width: 3))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('What to fix', style: EvType.bodyStrong),
           const SizedBox(height: 4),
@@ -191,7 +191,7 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(color: EvColors.forest, shape: BoxShape.circle, border: Border.all(color: EvColors.cream, width: 2)),
-                      child: const Icon(LucideIcons.camera, size: 13, color: EvColors.inkOnDark),
+                      child: Icon(LucideIcons.camera, size: 13, color: EvColors.inkOnDark),
                     ),
                   ),
                 ]),

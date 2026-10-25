@@ -202,7 +202,7 @@ class _OfflineBannerState extends ConsumerState<OfflineBanner> {
     // Light status-bar icons on the dark strip, dark again afterwards (Android
     // keeps the last style). Screens with their own style still win: theirs is deeper.
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: visible ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      value: visible && !EvColors.isDark ? SystemUiOverlayStyle.light : EvTheme.statusBar,
       child: body,
     );
   }

@@ -1,8 +1,10 @@
 import 'package:app_badge_plus/app_badge_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../design/ev.dart';
+import 'appearance.dart';
 import 'incoming_banner.dart';
 import 'providers.dart';
 import 'router.dart';
@@ -33,6 +35,28 @@ class _EvendaAppState extends ConsumerState<EvendaApp> with WidgetsBindingObserv
   /// notifications, quotes and bookings that arrived meanwhile were missing
   /// (and the bell didn't count them) until a restart. Coming back after more
   /// than a few seconds reconnects and refreshes everything.
+  // Light/dark: apply the palette, then rebuild every widget once so colours
+  // read from it everywhere (screens keep their state and scroll position).
+  void _applyAppearance() {
+    final p = paletteFor(ref.read(appearanceProvider), WidgetsBinding.instance.platformDispatcher.platformBrightness);
+    if (!EvColors.apply(p)) return;
+    SystemChrome.setSystemUIOverlayStyle(EvTheme.statusBar);
+    if (!mounted) return;
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      void rebuild(Element e) {
+        e.markNeedsBuild();
+        e.visitChildren(rebuild);
+      }
+
+      (context as Element).visitChildren(rebuild);
+    });
+  }
+
+  @override
+  void didChangePlatformBrightness() => _applyAppearance();
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
@@ -65,6 +89,7 @@ class _EvendaAppState extends ConsumerState<EvendaApp> with WidgetsBindingObserv
       final n = next.value;
       if (n != null) _setBadge(n);
     });
+    ref.listen(appearanceProvider, (_, _) => _applyAppearance());
     ref.listen(sessionProvider, (_, next) {
       if (next.hasValue && next.value == null) _setBadge(0);
     });

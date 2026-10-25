@@ -234,7 +234,7 @@ class _RingLikeACallState extends State<_RingLikeACall> with WidgetsBindingObser
             ]),
             const EvDivider(indent: 0),
             Row(children: [
-              const Icon(LucideIcons.batteryCharging, size: 18, color: EvColors.ink3),
+              Icon(LucideIcons.batteryCharging, size: 18, color: EvColors.ink3),
               const SizedBox(width: 8),
               Expanded(child: Text('If requests don\u2019t ring when Evenda is closed, let it run without battery limits.', style: EvType.small)),
               TextButton(onPressed: AlertTone.openBatterySettings, child: const Text('Open')),

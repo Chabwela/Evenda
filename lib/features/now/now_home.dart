@@ -28,7 +28,7 @@ class NowHomeScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Row(children: [
-          const Icon(LucideIcons.zap, color: EvColors.bronze, size: 20),
+          Icon(LucideIcons.zap, color: EvColors.bronze, size: 20),
           const SizedBox(width: 6),
           Text('Evenda Now', style: EvType.title),
         ]),
@@ -122,7 +122,7 @@ class _Step extends StatelessWidget {
               width: 22,
               height: 22,
               alignment: Alignment.center,
-              decoration: const BoxDecoration(color: EvColors.forest, shape: BoxShape.circle),
+              decoration: BoxDecoration(color: EvColors.forest, shape: BoxShape.circle),
               child: Text('$n', style: EvType.caption.copyWith(color: EvColors.inkOnDark, fontWeight: FontWeight.w700)),
             ),
             if (n < 3) Expanded(child: Container(height: 1.5, margin: const EdgeInsets.symmetric(horizontal: 6), color: EvColors.sand)),

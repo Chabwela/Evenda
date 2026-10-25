@@ -146,7 +146,7 @@ class _IncomingBannerState extends ConsumerState<IncomingBanner> {
                               child: const Text('View'),
                             )
                           else
-                            const Icon(LucideIcons.chevronRight, size: 18, color: EvColors.sand),
+                            Icon(LucideIcons.chevronRight, size: 18, color: EvColors.sand),
                         ]),
                       ),
                     ),

@@ -8,6 +8,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import 'app/app.dart';
+import 'app/appearance.dart';
+import 'design/ev.dart';
 import 'app/config.dart';
 import 'app/providers.dart';
 import 'core/push.dart';
@@ -21,7 +23,9 @@ Future<void> main() async {
   if (view.physicalSize.shortestSide / view.devicePixelRatio < 600) {
     await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   }
-  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent));
+  await AppearanceNotifier.load();
+  EvColors.apply(paletteFor(AppearanceNotifier.initial, PlatformDispatcher.instance.platformBrightness));
+  SystemChrome.setSystemUIOverlayStyle(EvTheme.statusBar);
 
   // Production only: the app always runs against Supabase. A build without
   // the backend settings is a packaging mistake, so say so instead of

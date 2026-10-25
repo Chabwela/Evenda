@@ -131,7 +131,7 @@ class _BodyState extends ConsumerState<_Body> {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       // Light status icons over the photo, dark once the bar turns cream.
-      value: _collapsed ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+      value: _collapsed ? EvTheme.statusBar : SystemUiOverlayStyle.light,
       child: Stack(children: [
       NotificationListener<ScrollNotification>(
         onNotification: (n) {
@@ -146,7 +146,7 @@ class _BodyState extends ConsumerState<_Body> {
           backgroundColor: EvColors.cream,
           surfaceTintColor: Colors.transparent,
           // The bar sets the status-bar style itself: light over the photo.
-          systemOverlayStyle: _collapsed ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+          systemOverlayStyle: _collapsed ? EvTheme.statusBar : SystemUiOverlayStyle.light,
           // The listing's name appears in the bar once the photo has scrolled away.
           title: AnimatedOpacity(
             opacity: _collapsed ? 1 : 0,
@@ -156,10 +156,10 @@ class _BodyState extends ConsumerState<_Body> {
           leading: Padding(
             padding: const EdgeInsets.all(6),
             child: _collapsed
-                ? IconButton(icon: const Icon(LucideIcons.arrowLeft, color: EvColors.ink), onPressed: () => context.pop())
+                ? IconButton(icon: Icon(LucideIcons.arrowLeft, color: EvColors.ink), onPressed: () => context.pop())
                 : CircleAvatar(
                     backgroundColor: EvColors.warmWhite.withValues(alpha: 0.92),
-                    child: IconButton(icon: const Icon(LucideIcons.arrowLeft, size: 20, color: EvColors.ink), onPressed: () => context.pop()),
+                    child: IconButton(icon: Icon(LucideIcons.arrowLeft, size: 20, color: EvColors.ink), onPressed: () => context.pop()),
                   ),
           ),
           flexibleSpace: FlexibleSpaceBar(
@@ -307,7 +307,7 @@ class _BodyState extends ConsumerState<_Body> {
                 for (final p in l.packageItems)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Row(children: [const Icon(LucideIcons.check, size: 16, color: EvColors.forest), const SizedBox(width: 8), Expanded(child: Text(p))]),
+                    child: Row(children: [Icon(LucideIcons.check, size: 16, color: EvColors.forest), const SizedBox(width: 8), Expanded(child: Text(p))]),
                   ),
               ]),
             ),
@@ -334,7 +334,7 @@ class _BodyState extends ConsumerState<_Body> {
         bottom: 0,
         child: Container(
           padding: EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, EvSpace.x3 + MediaQuery.paddingOf(context).bottom),
-          decoration: const BoxDecoration(color: EvColors.warmWhite, border: Border(top: BorderSide(color: EvColors.sand))),
+          decoration: BoxDecoration(color: EvColors.warmWhite, border: Border(top: BorderSide(color: EvColors.sand))),
           child: mine
               ? EvButton('Edit listing', icon: LucideIcons.squarePen, expand: true, onPressed: () => context.push('/business/listings/${l.id}'))
               : Row(children: [

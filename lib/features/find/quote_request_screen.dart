@@ -259,7 +259,7 @@ class _QuoteRequestScreenState extends ConsumerState<QuoteRequestScreen> {
       ),
       bottomSheet: data.hasValue
           ? Container(
-              decoration: const BoxDecoration(color: EvColors.cream, border: Border(top: BorderSide(color: EvColors.hairline))),
+              decoration: BoxDecoration(color: EvColors.cream, border: Border(top: BorderSide(color: EvColors.hairline))),
               padding: EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, EvSpace.x3 + MediaQuery.paddingOf(context).bottom),
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 // A rough idea of cost; the quotation sets the real price.
@@ -303,7 +303,7 @@ class _ItemRow extends StatelessWidget {
               Text(l == null ? 'Your own description' : priceLabel(l), style: EvType.caption),
             ]),
           ),
-          IconButton(tooltip: 'Remove', icon: const Icon(LucideIcons.x, size: 18, color: EvColors.ink3), onPressed: onRemove),
+          IconButton(tooltip: 'Remove', icon: Icon(LucideIcons.x, size: 18, color: EvColors.ink3), onPressed: onRemove),
         ]),
         const SizedBox(height: EvSpace.x2),
         Row(children: [

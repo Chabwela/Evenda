@@ -279,7 +279,7 @@ class _HomeBody extends ConsumerWidget {
     return CustomScrollView(
       slivers: [
         // Keeps scrolled content out from under the clock and battery icons.
-        const SliverAppBar(
+        SliverAppBar(
           pinned: true,
           toolbarHeight: 0,
           backgroundColor: EvColors.cream,
@@ -652,11 +652,11 @@ class _NowBanner extends StatelessWidget {
           Container(
             width: 40,
             height: 40,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: EvColors.bronzeTint,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               LucideIcons.zap,
               color: EvColors.bronzeDeep,
               size: 20,
@@ -683,7 +683,7 @@ class _NowBanner extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(
+          Icon(
             LucideIcons.arrowRight,
             color: EvColors.bronzeDeep,
             size: 20,

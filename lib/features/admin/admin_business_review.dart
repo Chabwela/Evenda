@@ -456,7 +456,7 @@ class _EarlierUploads extends ConsumerWidget {
                   [doc.status == 'rejected' ? 'Rejected' : (doc.status == 'accepted' ? 'Accepted' : 'Not reviewed'), if (doc.reviewNote != null) '“${doc.reviewNote}”'].join(' · '),
                   style: EvType.caption,
                 ),
-                trailing: const Icon(LucideIcons.eye, size: 16, color: EvColors.ink3),
+                trailing: Icon(LucideIcons.eye, size: 16, color: EvColors.ink3),
               ),
           ],
         ),
@@ -502,7 +502,7 @@ class _DecisionBar extends ConsumerWidget {
     if (stage == _Stage.verified || stage == _Stage.sentBack || stage == _Stage.notSubmitted) return const SizedBox.shrink();
     final canVerify = d.hasAcceptedDocument;
     return Container(
-      decoration: const BoxDecoration(color: EvColors.cream, border: Border(top: BorderSide(color: EvColors.hairline))),
+      decoration: BoxDecoration(color: EvColors.cream, border: Border(top: BorderSide(color: EvColors.hairline))),
       padding: EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, EvSpace.x3 + MediaQuery.paddingOf(context).bottom),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (!canVerify)
@@ -549,7 +549,7 @@ class _Fact extends StatelessWidget {
                 if (note != null) Text(note!.$1, style: EvType.caption.copyWith(color: note!.$2, fontWeight: FontWeight.w600)),
               ]),
             ),
-            if (action != null) const Icon(LucideIcons.externalLink, size: 16, color: EvColors.forest),
+            if (action != null) Icon(LucideIcons.externalLink, size: 16, color: EvColors.forest),
           ]),
         ),
       );

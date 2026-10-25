@@ -229,7 +229,7 @@ class _TaskGroupState extends State<_TaskGroup> {
             AnimatedRotation(
               turns: _open ? 0 : -0.25,
               duration: EvMotion.of(context, EvMotion.fast),
-              child: const Icon(LucideIcons.chevronDown, size: 18, color: EvColors.ink3),
+              child: Icon(LucideIcons.chevronDown, size: 18, color: EvColors.ink3),
             ),
           ]),
         ),
@@ -337,7 +337,7 @@ class _TaskRowState extends ConsumerState<TaskRow> with SingleTickerProviderStat
                   ),
                   const SizedBox(height: 2),
                   Row(children: [
-                    if (t.generated) ...[const Icon(LucideIcons.sparkles, size: 11, color: EvColors.bronze), const SizedBox(width: 4)],
+                    if (t.generated) ...[Icon(LucideIcons.sparkles, size: 11, color: EvColors.bronze), const SizedBox(width: 4)],
                     Flexible(
                       child: Text(meta, style: EvType.caption.copyWith(color: t.overdue ? EvColors.danger : EvColors.ink3), maxLines: 1, overflow: TextOverflow.ellipsis),
                     ),
@@ -388,7 +388,7 @@ class _CheckCircle extends StatelessWidget {
                 scale: checked ? 1 : 0,
                 duration: EvMotion.of(context, EvMotion.base),
                 curve: EvMotion.spring,
-                child: const Icon(LucideIcons.check, size: 14, color: EvColors.inkOnDark),
+                child: Icon(LucideIcons.check, size: 14, color: EvColors.inkOnDark),
               ),
             ),
           ),

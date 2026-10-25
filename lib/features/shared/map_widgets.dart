@@ -285,7 +285,7 @@ class _LocationPickerState extends State<LocationPicker> with WidgetsBindingObse
                       decoration: BoxDecoration(color: EvColors.ink, borderRadius: EvRadius.smAll),
                       child: Text(widget.pinLabel!, style: EvType.caption.copyWith(color: EvColors.inkOnDark)),
                     ),
-                  const Icon(LucideIcons.mapPin, size: 40, color: EvColors.forest, fill: 1),
+                  Icon(LucideIcons.mapPin, size: 40, color: EvColors.forest, fill: 1),
                 ]),
               ),
             ),
@@ -315,7 +315,7 @@ class _LocationPickerState extends State<LocationPicker> with WidgetsBindingObse
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     _locating
                         ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(LucideIcons.locateFixed, size: 18, color: EvColors.forest),
+                        : Icon(LucideIcons.locateFixed, size: 18, color: EvColors.forest),
                     const SizedBox(width: 8),
                     Text(_locating ? 'Finding you…' : 'Use my location', style: EvType.smallStrong.copyWith(color: EvColors.forest)),
                   ]),
