@@ -44,7 +44,9 @@ final _homeProvider = FutureProvider.autoDispose<_HomeData>((ref) async {
     b.bookings.requests(biz.id),
     b.work.events(biz.id),
     b.discovery.inventoryFeed(biz.id, limit: 8),
-    biz.rents ? b.listings.conflicts(biz.id) : Future.value(<InventoryConflict>[]),
+    biz.rents
+        ? b.listings.conflicts(biz.id)
+        : Future.value(<InventoryConflict>[]),
     b.now.inbox(biz.id),
     b.now.mine(biz.id),
     b.notifications.list(biz.id),
@@ -66,7 +68,15 @@ final _homeProvider = FutureProvider.autoDispose<_HomeData>((ref) async {
 
 /// A row in "Needs you": one prioritised list instead of a wall of widgets.
 class _Priority {
-  _Priority(this.rank, this.icon, this.tone, this.title, this.subtitle, this.route, {this.cta});
+  _Priority(
+    this.rank,
+    this.icon,
+    this.tone,
+    this.title,
+    this.subtitle,
+    this.route, {
+    this.cta,
+  });
   final int rank;
   final IconData icon;
   final Tone tone;
@@ -79,32 +89,122 @@ class _Priority {
 List<_Priority> _priorities(_HomeData d) {
   final out = <_Priority>[];
   final id = d.business.id;
-  for (final n in d.nowInbox.where((i) => i.request.status.live && i.myOffer == null && !i.declined)) {
-    out.add(_Priority(0, LucideIcons.zap, Tone.waiting, 'Urgent: ${n.request.quantity} × ${n.request.itemDescription}',
-        '${n.request.requester.name} · ${EvDates.relativeDay(n.request.neededFrom)} · ${n.distanceKm} km away', '/now/respond/${n.request.id}', cta: 'Respond'));
+  for (final n in d.nowInbox.where(
+    (i) => i.request.status.live && i.myOffer == null && !i.declined,
+  )) {
+    out.add(
+      _Priority(
+        0,
+        LucideIcons.zap,
+        Tone.waiting,
+        'Urgent: ${n.request.quantity} × ${n.request.itemDescription}',
+        '${n.request.requester.name} · ${EvDates.relativeDay(n.request.neededFrom)} · ${n.distanceKm} km away',
+        '/now/respond/${n.request.id}',
+        cta: 'Respond',
+      ),
+    );
   }
-  for (final t in d.tasks.where((t) => t.overdue)) {
-    out.add(_Priority(1, LucideIcons.alarmClock, Tone.critical, t.title, 'Overdue · was due ${EvDates.dayTime(t.dueAt)}', '/work/task/${t.id}'));
+  // Overdue tasks as one line (a list of red alarms reads like an error page).
+  final overdue = d.tasks.where((t) => t.overdue).toList()
+    ..sort((a, b) => a.dueAt.compareTo(b.dueAt));
+  if (overdue.length == 1) {
+    final t = overdue.first;
+    out.add(
+      _Priority(
+        1,
+        LucideIcons.alarmClock,
+        Tone.critical,
+        t.title,
+        'Overdue since ${EvDates.dayShort(t.dueAt)}',
+        '/work/task/${t.id}',
+      ),
+    );
+  } else if (overdue.length > 1) {
+    out.add(
+      _Priority(
+        1,
+        LucideIcons.alarmClock,
+        Tone.critical,
+        '${overdue.length} overdue tasks',
+        'Oldest: ${overdue.first.title} · ${EvDates.dayShort(overdue.first.dueAt)}',
+        '/work',
+        cta: 'Review',
+      ),
+    );
   }
-  for (final q in d.requests.where((q) => q.supplier.id == id && q.status == QuoteRequestStatus.open)) {
-    out.add(_Priority(2, LucideIcons.inbox, Tone.waiting, 'Quote request from ${q.requester.name}',
-        '${q.items.map((i) => '${i.quantity} × ${i.description}').join(', ')} · ${EvDates.day(q.neededFrom)}', '/bookings/request/${q.id}', cta: 'Quote'));
+  for (final q in d.requests.where(
+    (q) => q.supplier.id == id && q.status == QuoteRequestStatus.open,
+  )) {
+    out.add(
+      _Priority(
+        2,
+        LucideIcons.inbox,
+        Tone.waiting,
+        'Quote request from ${q.requester.name}',
+        '${q.items.map((i) => '${i.quantity} × ${i.description}').join(', ')} · ${EvDates.day(q.neededFrom)}',
+        '/bookings/request/${q.id}',
+        cta: 'Quote',
+      ),
+    );
   }
   final seen = <String>{};
   for (final c in d.conflicts) {
     if (!seen.add(c.listingId)) continue;
-    out.add(_Priority(3, LucideIcons.triangleAlert, Tone.attention, '${c.title}: ${c.shortfall} short on ${EvDates.day(c.day)}',
-        '${c.committed} committed, ${c.usable} usable. Repair, restock or source the difference.', '/business/inventory?listing=${c.listingId}'));
+    out.add(
+      _Priority(
+        3,
+        LucideIcons.triangleAlert,
+        Tone.attention,
+        '${c.title}: ${c.shortfall} short on ${EvDates.day(c.day)}',
+        '${c.committed} committed, ${c.usable} usable. Repair, restock or source the difference.',
+        '/business/inventory?listing=${c.listingId}',
+      ),
+    );
   }
-  for (final q in d.requests.where((q) => q.requester.id == id && q.openQuotation != null)) {
-    out.add(_Priority(4, LucideIcons.fileText, Tone.progress, '${q.supplier.name} sent a quotation',
-        '${Money.k(q.openQuotation!.total)} · valid until ${EvDates.dayShort(q.openQuotation!.validUntil)}', '/bookings/request/${q.id}', cta: 'Review'));
+  for (final q in d.requests.where(
+    (q) => q.requester.id == id && q.openQuotation != null,
+  )) {
+    out.add(
+      _Priority(
+        4,
+        LucideIcons.fileText,
+        Tone.progress,
+        '${q.supplier.name} sent a quotation',
+        '${Money.k(q.openQuotation!.total)} · valid until ${EvDates.dayShort(q.openQuotation!.validUntil)}',
+        '/bookings/request/${q.id}',
+        cta: 'Review',
+      ),
+    );
   }
-  for (final p in d.bookings.where((b) => b.payments.any((p) => p.confirmedAt == null && p.recordedByBusinessId != id))) {
-    out.add(_Priority(5, LucideIcons.handCoins, Tone.waiting, 'Confirm payment on ${p.reference}', 'Recorded by ${p.counterparty(id).name}', '/bookings/${p.id}'));
+  for (final p in d.bookings.where(
+    (b) => b.payments.any(
+      (p) => p.confirmedAt == null && p.recordedByBusinessId != id,
+    ),
+  )) {
+    out.add(
+      _Priority(
+        5,
+        LucideIcons.handCoins,
+        Tone.waiting,
+        'Confirm payment on ${p.reference}',
+        'Recorded by ${p.counterparty(id).name}',
+        '/bookings/${p.id}',
+      ),
+    );
   }
-  for (final t in d.tasks.where((t) => !t.overdue && EvDates.sameDay(t.dueAt, DateTime.now()))) {
-    out.add(_Priority(6, LucideIcons.circleDot, toneForPriority(t.priority), t.title, 'Today · ${EvDates.time(t.dueAt)}', '/work/task/${t.id}'));
+  for (final t in d.tasks.where(
+    (t) => !t.overdue && EvDates.sameDay(t.dueAt, DateTime.now()),
+  )) {
+    out.add(
+      _Priority(
+        6,
+        LucideIcons.circleDot,
+        toneForPriority(t.priority),
+        t.title,
+        'Today · ${EvDates.time(t.dueAt)}',
+        '/work/task/${t.id}',
+      ),
+    );
   }
   out.sort((a, b) => a.rank.compareTo(b.rank));
   return out;
@@ -137,7 +237,9 @@ class _HomeBody extends ConsumerWidget {
 
   String _greeting() {
     final h = EvDates.nowLusaka().hour;
-    return h < 12 ? 'Good morning' : (h < 17 ? 'Good afternoon' : 'Good evening');
+    return h < 12
+        ? 'Good morning'
+        : (h < 17 ? 'Good afternoon' : 'Good evening');
   }
 
   @override
@@ -146,178 +248,330 @@ class _HomeBody extends ConsumerWidget {
     final unread = ref.watch(unreadCountProvider).value ?? 0;
     final first = (session?.fullName ?? '').split(' ').first;
     final priorities = _priorities(d);
-    final upcoming = d.events.where((e) => e.status != EventStatus.cancelled && e.endsAt.isAfter(DateTime.now())).take(6).toList();
-    final waiting = d.requests.where((q) => q.requester.id == d.business.id && q.status == QuoteRequestStatus.open).toList();
+    final upcoming = d.events
+        .where(
+          (e) =>
+              e.status != EventStatus.cancelled &&
+              e.endsAt.isAfter(DateTime.now()),
+        )
+        .take(6)
+        .toList();
+    final waiting = d.requests
+        .where(
+          (q) =>
+              q.requester.id == d.business.id &&
+              q.status == QuoteRequestStatus.open,
+        )
+        .toList();
     final liveNow = d.nowMine.where((r) => r.status.live).toList();
 
-    return CustomScrollView(slivers: [
-      SliverSafeArea(
-        bottom: false,
-        sliver: SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.x2, 0),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    Flexible(child: Text(d.business.name, style: EvType.smallStrong.copyWith(color: EvColors.ink2), overflow: TextOverflow.ellipsis)),
-                  ]),
-                  const SizedBox(height: 4),
-                  Text(first.isEmpty ? _greeting() : '${_greeting()}, $first', style: EvType.display),
-                  const SizedBox(height: 2),
-                  Text(EvDates.dayLong(DateTime.now()), style: EvType.small),
-                ]),
-              ),
-              EvIconButton(LucideIcons.bell, tooltip: 'Notifications', badge: unread, onPressed: () => context.push('/notifications')),
-            ]),
-          ),
+    return CustomScrollView(
+      slivers: [
+        // Keeps scrolled content out from under the clock and battery icons.
+        const SliverAppBar(
+          pinned: true,
+          toolbarHeight: 0,
+          backgroundColor: EvColors.cream,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
         ),
-      ),
-
-      // Needs you
-      SliverToBoxAdapter(child: SectionHeader('Needs you', count: priorities.length, action: 'All tasks', onAction: () => context.go('/work'))),
-      SliverToBoxAdapter(
-        child: priorities.isEmpty
-            ? Padding(
-                padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
-                child: EvSurface(
-                  child: Row(children: [
-                    const MascotImage(Mascot.calendar, size: 56),
-                    const SizedBox(width: EvSpace.x4),
-                    Expanded(child: Text('Nothing urgent. You’re on top of today.', style: EvType.bodyStrong)),
-                  ]),
-                ),
-              )
-            : Padding(
-                padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
-                child: EvSurface(
-                  padding: EdgeInsets.zero,
-                  child: Column(children: [
-                    for (final (i, p) in priorities.take(6).indexed) ...[
-                      if (i > 0) const EvDivider(indent: 64),
-                      EvArrive(
-                        delay: EvMotion.stagger * i,
-                        child: EvRow(
-                          padding: const EdgeInsets.symmetric(horizontal: EvSpace.x4, vertical: 12),
-                          leading: IconTile(p.icon, tone: p.tone),
-                          title: p.title,
-                          subtitle: p.subtitle,
-                          trailing: p.cta == null ? null : Text(p.cta!, style: EvType.smallStrong.copyWith(color: EvColors.forest)),
-                          onTap: () => context.push(p.route),
-                        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              EvSpace.gutter,
+              EvSpace.x3,
+              EvSpace.x2,
+              0,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              d.business.name,
+                              style: EvType.smallStrong.copyWith(
+                                color: EvColors.ink2,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        first.isEmpty ? _greeting() : '${_greeting()}, $first',
+                        style: EvType.display,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        EvDates.dayLong(DateTime.now()),
+                        style: EvType.small,
                       ),
                     ],
-                    if (priorities.length > 6)
-                      TextButton(onPressed: () => context.go('/work'), child: Text('${priorities.length - 6} more')),
-                  ]),
+                  ),
                 ),
-              ),
-      ),
-
-      // Evenda Now
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x4, EvSpace.gutter, 0),
-          child: _NowBanner(live: liveNow),
-        ),
-      ),
-
-      // Quick actions
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x4, EvSpace.gutter, 0),
-          child: Row(children: [
-            _Quick(LucideIcons.packagePlus, 'New listing', () => context.push('/business/listings/new')),
-            if (d.business.rents) _Quick(LucideIcons.notebookPen, 'Record a job', () => context.push('/business/availability')),
-            _Quick(LucideIcons.calendarPlus, 'New event', () => context.push('/work/event/new')),
-            _Quick(LucideIcons.search, 'Find stock', () => context.go('/find')),
-          ]),
-        ),
-      ),
-
-      // Upcoming events
-      SliverToBoxAdapter(child: SectionHeader('Upcoming events', action: 'Calendar', onAction: () => context.go('/work?tab=calendar'))),
-      SliverToBoxAdapter(
-        child: upcoming.isEmpty
-            ? Padding(
-                padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
-                child: EvSurface(
-                  onTap: () => context.push('/work/event/new'),
-                  child: Row(children: [
-                    const Icon(LucideIcons.calendarPlus, color: EvColors.forest),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text('No upcoming events. Add one to plan tasks and reminders.', style: EvType.body)),
-                  ]),
+                EvIconButton(
+                  LucideIcons.bell,
+                  tooltip: 'Notifications',
+                  badge: unread,
+                  onPressed: () => context.push('/notifications'),
                 ),
-              )
-            : SizedBox(
-                height: 132,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
-                  itemCount: upcoming.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 10),
-                  itemBuilder: (c, i) => _EventCard(event: upcoming[i], tasks: d.tasks.where((t) => t.eventId == upcoming[i].id).toList()),
-                ),
-              ),
-      ),
-
-      // Supplier updates
-      if (d.feed.isNotEmpty) ...[
-        SliverToBoxAdapter(child: SectionHeader('Supplier updates', action: 'Settings', onAction: () => context.push('/business/notifications'))),
-        SliverToBoxAdapter(
-          child: SizedBox(
-            height: 246,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
-              itemCount: d.feed.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (c, i) => EvArrive(delay: EvMotion.stagger * i, child: InventoryUpdateCard(update: d.feed[i])),
+              ],
             ),
           ),
         ),
-      ],
 
-      // Waiting on suppliers
-      if (waiting.isNotEmpty) ...[
-        SliverToBoxAdapter(child: SectionHeader('Waiting on suppliers', count: waiting.length)),
+        // Quick actions: the everyday shortcuts, near the top.
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              EvSpace.gutter,
+              EvSpace.x4,
+              EvSpace.gutter,
+              0,
+            ),
+            child: Row(
+              children: [
+                _Quick(
+                  LucideIcons.search,
+                  'Find stock',
+                  () => context.go('/find'),
+                ),
+                _Quick(
+                  LucideIcons.packagePlus,
+                  'New listing',
+                  () => context.push('/business/listings/new'),
+                ),
+                if (d.business.rents)
+                  _Quick(
+                    LucideIcons.notebookPen,
+                    'Record a job',
+                    () => context.push('/business/availability'),
+                  ),
+                _Quick(
+                  LucideIcons.calendarPlus,
+                  'New event',
+                  () => context.push('/work/event/new'),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Needs you
+        SliverToBoxAdapter(
+          child: SectionHeader(
+            'Needs you',
+            count: priorities.length,
+            action: 'All tasks',
+            onAction: () => context.go('/work'),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: priorities.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: EvSpace.gutter,
+                  ),
+                  child: EvSurface(
+                    child: Row(
+                      children: [
+                        const MascotImage(Mascot.calendar, size: 56),
+                        const SizedBox(width: EvSpace.x4),
+                        Expanded(
+                          child: Text(
+                            'Nothing urgent. You’re on top of today.',
+                            style: EvType.bodyStrong,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: EvSpace.gutter,
+                  ),
+                  child: EvSurface(
+                    padding: EdgeInsets.zero,
+                    child: Column(
+                      children: [
+                        for (final (i, p) in priorities.take(4).indexed) ...[
+                          if (i > 0) const EvDivider(indent: 64),
+                          EvArrive(
+                            delay: EvMotion.stagger * i,
+                            child: EvRow(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: EvSpace.x4,
+                                vertical: 12,
+                              ),
+                              leading: IconTile(p.icon, tone: p.tone),
+                              title: p.title,
+                              subtitle: p.subtitle,
+                              trailing: p.cta == null
+                                  ? null
+                                  : Text(
+                                      p.cta!,
+                                      style: EvType.smallStrong.copyWith(
+                                        color: EvColors.forest,
+                                      ),
+                                    ),
+                              onTap: () => context.push(p.route),
+                            ),
+                          ),
+                        ],
+                        if (priorities.length > 4) ...[
+                          const EvDivider(indent: 0),
+                          TextButton(
+                            onPressed: () => context.go('/work'),
+                            child: Text('See all ${priorities.length}'),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+        ),
+
+        // Evenda Now
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              EvSpace.gutter,
+              EvSpace.x4,
+              EvSpace.gutter,
+              0,
+            ),
+            child: _NowBanner(live: liveNow),
+          ),
+        ),
+
+        // Upcoming events
+        if (upcoming.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: SectionHeader(
+              'Upcoming events',
+              action: 'Calendar',
+              onAction: () => context.go('/work?tab=calendar'),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 132,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
+                itemCount: upcoming.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                itemBuilder: (c, i) => _EventCard(
+                  event: upcoming[i],
+                  tasks: d.tasks
+                      .where((t) => t.eventId == upcoming[i].id)
+                      .toList(),
+                ),
+              ),
+            ),
+          ),
+        ],
+
+        // Supplier updates
+        if (d.feed.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: SectionHeader(
+              'Supplier updates',
+              action: 'Settings',
+              onAction: () => context.push('/business/notifications'),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 246,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
+                itemCount: d.feed.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                itemBuilder: (c, i) => EvArrive(
+                  delay: EvMotion.stagger * i,
+                  child: InventoryUpdateCard(update: d.feed[i]),
+                ),
+              ),
+            ),
+          ),
+        ],
+
+        // Waiting on suppliers
+        if (waiting.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: SectionHeader(
+              'Waiting for quotes',
+              count: waiting.length,
+              action: waiting.length > 3 ? 'See all' : null,
+              onAction: () => context.go('/bookings?tab=sent'),
+            ),
+          ),
+          SliverList.separated(
+            itemCount: waiting.take(3).length,
+            separatorBuilder: (_, _) => const EvDivider(indent: 72),
+            itemBuilder: (c, i) {
+              final q = waiting[i];
+              return EvRow(
+                leading: BusinessAvatar(
+                  name: q.supplier.name,
+                  logoUrl: q.supplier.logoUrl,
+                  size: 40,
+                ),
+                title: q.items
+                    .map((i) => '${i.quantity} × ${i.description}')
+                    .join(', '),
+                subtitle:
+                    '${q.supplier.name} · sent ${EvDates.ago(q.createdAt)}',
+                onTap: () => context.push('/bookings/request/${q.id}'),
+              );
+            },
+          ),
+        ],
+
+        // Recent activity
+        SliverToBoxAdapter(
+          child: SectionHeader(
+            'Recent activity',
+            action: 'All',
+            onAction: () => context.push('/notifications'),
+          ),
+        ),
         SliverList.separated(
-          itemCount: waiting.length,
-          separatorBuilder: (_, _) => const EvDivider(indent: 72),
+          itemCount: d.activity.take(3).length,
+          separatorBuilder: (_, _) => const EvDivider(indent: 64),
           itemBuilder: (c, i) {
-            final q = waiting[i];
+            final n = d.activity[i];
             return EvRow(
-              leading: BusinessAvatar(name: q.supplier.name, logoUrl: q.supplier.logoUrl, size: 40),
-              title: q.supplier.name,
-              subtitle: '${q.items.map((i) => '${i.quantity} × ${i.description}').join(', ')} · sent ${EvDates.ago(q.createdAt)}',
-              trailing: StatusPill(q.status.label, tone: toneForRequest(q.status), dense: true),
-              onTap: () => context.push('/bookings/request/${q.id}'),
+              dense: true,
+              leading: IconTile(
+                notificationIcon(n.category),
+                tone: n.unread ? Tone.positive : Tone.neutral,
+                size: 32,
+              ),
+              title: n.title,
+              titleStyle: n.unread
+                  ? EvType.smallStrong
+                  : EvType.small.copyWith(color: EvColors.ink),
+              subtitle: EvDates.ago(n.createdAt),
+              trailing: const SizedBox.shrink(),
+              onTap: n.route == null ? null : () => context.push(n.route!),
             );
           },
         ),
+        const SliverToBoxAdapter(child: SizedBox(height: EvSpace.x10)),
       ],
-
-      // Recent activity
-      SliverToBoxAdapter(child: SectionHeader('Recent activity', action: 'All', onAction: () => context.push('/notifications'))),
-      SliverList.separated(
-        itemCount: d.activity.take(4).length,
-        separatorBuilder: (_, _) => const EvDivider(indent: 64),
-        itemBuilder: (c, i) {
-          final n = d.activity[i];
-          return EvRow(
-            dense: true,
-            leading: IconTile(notificationIcon(n.category), tone: n.unread ? Tone.positive : Tone.neutral, size: 32),
-            title: n.title,
-            titleStyle: n.unread ? EvType.smallStrong : EvType.small.copyWith(color: EvColors.ink),
-            subtitle: EvDates.ago(n.createdAt),
-            trailing: const SizedBox.shrink(),
-            onTap: n.route == null ? null : () => context.push(n.route!),
-          );
-        },
-      ),
-      const SliverToBoxAdapter(child: SizedBox(height: EvSpace.x10)),
-    ]);
+    );
   }
 }
 
@@ -329,24 +583,38 @@ class _Quick extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Expanded(
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: EvRadius.mdAll,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(color: EvColors.warmWhite, borderRadius: EvRadius.mdAll, border: Border.all(color: EvColors.hairline)),
-                child: Icon(icon, size: 21, color: EvColors.forest),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: EvRadius.mdAll,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: EvColors.warmWhite,
+                borderRadius: EvRadius.mdAll,
+                border: Border.all(color: EvColors.hairline),
               ),
-              const SizedBox(height: 6),
-              Text(label, style: EvType.caption.copyWith(color: EvColors.ink, fontWeight: FontWeight.w600), textAlign: TextAlign.center, maxLines: 1),
-            ]),
-          ),
+              child: Icon(icon, size: 21, color: EvColors.forest),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: EvType.caption.copyWith(
+                color: EvColors.ink,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+            ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _NowBanner extends StatelessWidget {
@@ -360,26 +628,49 @@ class _NowBanner extends StatelessWidget {
     return EvSurface(
       onTap: () => context.push(r == null ? '/now' : '/now/${r.id}'),
       padding: const EdgeInsets.all(EvSpace.x4),
-      child: Row(children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(color: EvColors.bronzeTint, shape: BoxShape.circle),
-              child: const Icon(LucideIcons.zap, color: EvColors.bronzeDeep, size: 20),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: EvColors.bronzeTint,
+              shape: BoxShape.circle,
             ),
-            const SizedBox(width: EvSpace.x3),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(r == null ? 'Short on stock?' : 'Evenda Now · ${r.status.label}', style: EvType.bodyStrong),
+            child: const Icon(
+              LucideIcons.zap,
+              color: EvColors.bronzeDeep,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: EvSpace.x3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  r == null
+                      ? 'Short on stock?'
+                      : 'Evenda Now · ${r.status.label}',
+                  style: EvType.bodyStrong,
+                ),
                 const SizedBox(height: 2),
                 Text(
-                  r == null ? 'Evenda Now asks nearby suppliers who have it free.' : '${r.quantity} × ${r.itemDescription} · ${plural(r.recipientsCount, 'supplier')} notified',
+                  r == null
+                      ? 'Evenda Now asks nearby suppliers who have it free.'
+                      : '${r.quantity} × ${r.itemDescription} · ${plural(r.recipientsCount, 'supplier')} notified',
                   style: EvType.small,
                 ),
-              ]),
+              ],
             ),
-            const Icon(LucideIcons.arrowRight, color: EvColors.bronzeDeep, size: 20),
-      ]),
+          ),
+          const Icon(
+            LucideIcons.arrowRight,
+            color: EvColors.bronzeDeep,
+            size: 20,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -398,32 +689,76 @@ class _EventCard extends StatelessWidget {
       child: EvSurface(
         onTap: () => context.push('/work/event/${event.id}'),
         padding: const EdgeInsets.all(EvSpace.x3),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(
-            width: 52,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(color: EvColors.forestWash, borderRadius: EvRadius.smAll),
-            child: Column(children: [
-              Text(EvDates.day(event.startsAt).split(' ').first.toUpperCase(), style: EvType.overline.copyWith(color: EvColors.forest)),
-              Text('${event.startsAt.day}', style: EvType.number.copyWith(color: EvColors.forest)),
-            ]),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(event.name, style: EvType.bodyStrong, maxLines: 2, overflow: TextOverflow.ellipsis),
-              const SizedBox(height: 2),
-              Text(event.venueName ?? event.type.label, style: EvType.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
-              const Spacer(),
-              Row(children: [
-                Icon(overdue > 0 ? LucideIcons.alarmClock : LucideIcons.listChecks, size: 14, color: overdue > 0 ? EvColors.danger : EvColors.ink3),
-                const SizedBox(width: 4),
-                Text(overdue > 0 ? '$overdue overdue' : (open == 0 ? 'All tasks done' : '$open open tasks'),
-                    style: EvType.caption.copyWith(color: overdue > 0 ? EvColors.danger : EvColors.ink2, fontWeight: FontWeight.w600)),
-              ]),
-            ]),
-          ),
-        ]),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 52,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: EvColors.forestWash,
+                borderRadius: EvRadius.smAll,
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    EvDates.day(event.startsAt).split(' ').first.toUpperCase(),
+                    style: EvType.overline.copyWith(color: EvColors.forest),
+                  ),
+                  Text(
+                    '${event.startsAt.day}',
+                    style: EvType.number.copyWith(color: EvColors.forest),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    event.name,
+                    style: EvType.bodyStrong,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    event.venueName ?? event.type.label,
+                    style: EvType.caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const Spacer(),
+                  Row(
+                    children: [
+                      Icon(
+                        overdue > 0
+                            ? LucideIcons.alarmClock
+                            : LucideIcons.listChecks,
+                        size: 14,
+                        color: overdue > 0 ? EvColors.danger : EvColors.ink3,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        overdue > 0
+                            ? '$overdue overdue'
+                            : (open == 0
+                                  ? 'All tasks done'
+                                  : '$open open tasks'),
+                        style: EvType.caption.copyWith(
+                          color: overdue > 0 ? EvColors.danger : EvColors.ink2,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
