@@ -264,6 +264,17 @@ class _HomeBody extends ConsumerWidget {
         )
         .toList();
     final liveNow = d.nowMine.where((r) => r.status.live).toList();
+    // Recent activity skips what the screen already shows above, and repeats.
+    final shown = {
+      for (final p in priorities.take(4)) p.route,
+      for (final q in waiting.take(3)) '/bookings/request/${q.id}',
+      for (final r in liveNow) '/now/${r.id}',
+    };
+    final titles = <String>{};
+    final activity = d.activity
+        .where((n) => !shown.contains(n.route) && titles.add(n.title))
+        .take(3)
+        .toList();
 
     return CustomScrollView(
       slivers: [
@@ -500,7 +511,13 @@ class _HomeBody extends ConsumerWidget {
                 separatorBuilder: (_, _) => const SizedBox(width: 12),
                 itemBuilder: (c, i) => EvArrive(
                   delay: EvMotion.stagger * i,
-                  child: InventoryUpdateCard(update: d.feed[i]),
+                  // One update fills the row; several scroll sideways.
+                  child: InventoryUpdateCard(
+                    update: d.feed[i],
+                    width: d.feed.length == 1
+                        ? MediaQuery.sizeOf(context).width - 2 * EvSpace.gutter
+                        : 220,
+                  ),
                 ),
               ),
             ),
@@ -539,36 +556,38 @@ class _HomeBody extends ConsumerWidget {
           ),
         ],
 
-        // Recent activity
-        SliverToBoxAdapter(
-          child: SectionHeader(
-            'Recent activity',
-            action: 'All',
-            onAction: () => context.push('/notifications'),
+        if (activity.isNotEmpty) ...[
+          // Recent activity
+          SliverToBoxAdapter(
+            child: SectionHeader(
+              'Recent activity',
+              action: 'All',
+              onAction: () => context.push('/notifications'),
+            ),
           ),
-        ),
-        SliverList.separated(
-          itemCount: d.activity.take(3).length,
-          separatorBuilder: (_, _) => const EvDivider(indent: 64),
-          itemBuilder: (c, i) {
-            final n = d.activity[i];
-            return EvRow(
-              dense: true,
-              leading: IconTile(
-                notificationIcon(n.category),
-                tone: n.unread ? Tone.positive : Tone.neutral,
-                size: 32,
-              ),
-              title: n.title,
-              titleStyle: n.unread
-                  ? EvType.smallStrong
-                  : EvType.small.copyWith(color: EvColors.ink),
-              subtitle: EvDates.ago(n.createdAt),
-              trailing: const SizedBox.shrink(),
-              onTap: n.route == null ? null : () => context.push(n.route!),
-            );
-          },
-        ),
+          SliverList.separated(
+            itemCount: activity.length,
+            separatorBuilder: (_, _) => const EvDivider(indent: 64),
+            itemBuilder: (c, i) {
+              final n = activity[i];
+              return EvRow(
+                dense: true,
+                leading: IconTile(
+                  notificationIcon(n.category),
+                  tone: n.unread ? Tone.positive : Tone.neutral,
+                  size: 32,
+                ),
+                title: n.title,
+                titleStyle: n.unread
+                    ? EvType.smallStrong
+                    : EvType.small.copyWith(color: EvColors.ink),
+                subtitle: EvDates.ago(n.createdAt),
+                trailing: const SizedBox.shrink(),
+                onTap: n.route == null ? null : () => context.push(n.route!),
+              );
+            },
+          ),
+        ],
         const SliverToBoxAdapter(child: SizedBox(height: EvSpace.x10)),
       ],
     );
