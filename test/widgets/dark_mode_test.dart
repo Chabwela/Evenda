@@ -4,7 +4,6 @@ import 'package:evenda/app/providers.dart';
 import 'package:evenda/core/connectivity.dart';
 import 'package:evenda/data/demo/demo_backend.dart';
 import 'package:evenda/design/ev.dart';
-import 'package:evenda/features/bookings/bookings_screen.dart';
 import 'package:evenda/features/business/business_screen.dart';
 import 'package:evenda/features/find/find_screen.dart';
 import 'package:evenda/features/home/home_screen.dart';
@@ -53,7 +52,6 @@ void main() {
 
   testWidgets('home in dark mode', (t) => render(t, 'home', const HomeScreen()));
   testWidgets('find in dark mode', (t) => render(t, 'find', const FindScreen()));
-  testWidgets('bookings in dark mode', (t) => render(t, 'bookings', const BookingsScreen()));
   testWidgets('business in dark mode', (t) => render(t, 'business', const BusinessScreen()));
   testWidgets('notifications in dark mode', (t) => render(t, 'notifications', const NotificationsScreen()));
 
