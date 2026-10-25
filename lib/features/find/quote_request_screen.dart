@@ -113,9 +113,39 @@ class _QuoteRequestScreenState extends ConsumerState<QuoteRequestScreen> {
     if (id != null) context.pushReplacement('/bookings/request/$id');
   }
 
+  /// What the listed prices come to for these quantities and dates, and
+  /// whether some lines have no usable price (custom items, hourly, on quote).
+  (double, bool) _estimate() {
+    final days = _to.difference(_from).inDays + 1;
+    var total = 0.0;
+    var partial = false;
+    for (final l in _lines) {
+      final x = l.listing;
+      final price = x?.priceAmount;
+      if (x == null || price == null) {
+        partial = true;
+        continue;
+      }
+      switch (x.priceUnit) {
+        case PriceUnit.perItemPerDay:
+          total += price * l.quantity * days;
+        case PriceUnit.perItemPerEvent || PriceUnit.perEvent || PriceUnit.perPackage:
+          total += price * l.quantity;
+        case PriceUnit.perHour || PriceUnit.onQuote:
+          partial = true;
+      }
+    }
+    return (total, partial);
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = ref.watch(_supplierListingsProvider(widget.supplierId));
+    const section = EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2);
+    // Add the item they came from before working out the estimate.
+    if (data.value case final r?) _seed(r.$2);
+    final (estimate, partial) = _estimate();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Request a quotation')),
       body: AsyncView(
@@ -124,46 +154,44 @@ class _QuoteRequestScreenState extends ConsumerState<QuoteRequestScreen> {
         data: (r) {
           final (supplier, listings, events) = r;
           _seed(listings);
-          return ListView(padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, 140), children: [
+          return ListView(padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, 160), children: [
+            // Who you're asking.
             Row(children: [
-              BusinessAvatar(name: supplier.name, logoUrl: supplier.logoUrl, verified: supplier.verified),
+              BusinessAvatar(name: supplier.name, logoUrl: supplier.logoUrl, verified: supplier.verified, size: 44),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(supplier.name, style: EvType.bodyStrong),
-                  Text('Replies with a quotation you can accept, query or decline', style: EvType.small),
+                  Text(supplier.name, style: EvType.bodyStrong, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  Text('They reply with a quotation you can accept, query or decline.', style: EvType.small),
                 ]),
               ),
             ]),
-            const SizedBox(height: EvSpace.x6),
-            Text('ITEMS', style: EvType.overline),
-            const SizedBox(height: EvSpace.x2),
-            for (final (i, line) in _lines.indexed)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: EvSurface(
-                  padding: const EdgeInsets.all(EvSpace.x3),
-                  child: Row(children: [
-                    if (line.listing != null) ...[EvPhoto(line.listing!.coverPhoto, width: 52, height: 52, radius: EvRadius.sm), const SizedBox(width: 12)],
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(line.description, style: EvType.bodyStrong, maxLines: 2, overflow: TextOverflow.ellipsis),
-                        if (line.listing != null) Text(priceLabel(line.listing!), style: EvType.caption),
-                      ]),
+
+            // What you need: one row per item, name on its own line.
+            SectionHeader('Items', count: _lines.isEmpty ? null : _lines.length, padding: section),
+            if (_lines.isNotEmpty)
+              EvSurface(
+                padding: EdgeInsets.zero,
+                child: Column(children: [
+                  for (final (i, line) in _lines.indexed) ...[
+                    if (i > 0) const EvDivider(indent: EvSpace.x4),
+                    _ItemRow(
+                      line: line,
+                      onQuantity: (v) => setState(() => line.quantity = v),
+                      onRemove: () => setState(() => _lines.removeAt(i)),
                     ),
-                    SizedBox(
-                      width: 150,
-                      child: EvQuantityStepper(value: line.quantity, min: 1, step: line.quantity >= 20 ? 10 : 1, onChanged: (v) => setState(() => line.quantity = v)),
-                    ),
-                    IconButton(icon: const Icon(LucideIcons.x, size: 18, color: EvColors.ink3), onPressed: () => setState(() => _lines.removeAt(i))),
-                  ]),
-                ),
-              ),
+                  ],
+                ]),
+              )
+            else
+              Text('Add what you need from ${supplier.name}.', style: EvType.small),
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(onPressed: () => _addLine(listings), icon: const Icon(LucideIcons.plus, size: 18), label: const Text('Add item')),
             ),
-            const SizedBox(height: EvSpace.x4),
+
+            // When and where.
+            const SectionHeader('When and where', padding: section),
             EvPickerField(
               label: 'Dates needed',
               value: EvDates.range(_from, _to),
@@ -177,22 +205,38 @@ class _QuoteRequestScreenState extends ConsumerState<QuoteRequestScreen> {
                 );
                 if (r != null) {
                   setState(() {
-                  _from = r.start;
-                  _to = r.end;
-                });
+                    _from = r.start;
+                    _to = r.end;
+                  });
                 }
               },
             ),
-            const SizedBox(height: EvSpace.x5),
-            const EvFieldLabel('Delivery arrangement'),
-            for (final f in Fulfilment.values) ...[
-              EvOptionTile(title: f.label, selected: _fulfilment == f, onTap: () => setState(() => _fulfilment = f)),
-              const SizedBox(height: 6),
+            const SizedBox(height: EvSpace.x4),
+            const EvFieldLabel('Delivery'),
+            EvSurface(
+              padding: EdgeInsets.zero,
+              child: Column(children: [
+                for (final (i, f) in Fulfilment.values.indexed) ...[
+                  if (i > 0) const EvDivider(indent: EvSpace.x4),
+                  _ChoiceRow(
+                    title: switch (f) {
+                      Fulfilment.pickup => 'I’ll collect',
+                      Fulfilment.supplierDelivers => 'They deliver',
+                      Fulfilment.supplierSetsUp => 'They deliver and set up',
+                    },
+                    selected: _fulfilment == f,
+                    onTap: () => setState(() => _fulfilment = f),
+                  ),
+                ],
+              ]),
+            ),
+            if (_fulfilment != Fulfilment.pickup) ...[
+              const SizedBox(height: EvSpace.x4),
+              EvField(label: 'Venue or delivery address', controller: _venue, hint: 'e.g. Garden venue, Leopards Hill Road'),
             ],
-            Text('Evenda records what you agree; it doesn’t arrange transport.', style: EvType.caption),
-            const SizedBox(height: EvSpace.x5),
-            EvField(label: 'Venue or delivery address', controller: _venue, hint: 'e.g. Garden venue, Leopards Hill Road', optional: _fulfilment == Fulfilment.pickup),
-            const SizedBox(height: EvSpace.x5),
+
+            // Anything else.
+            const SectionHeader('Anything else', padding: section),
             if (events.isNotEmpty) ...[
               EvPickerField(
                 label: 'For which event?',
@@ -207,19 +251,91 @@ class _QuoteRequestScreenState extends ConsumerState<QuoteRequestScreen> {
                   if (mounted) setState(() => _eventId = id);
                 },
               ),
-              const SizedBox(height: EvSpace.x5),
+              const SizedBox(height: EvSpace.x4),
             ],
-            EvField(label: 'Message', controller: _message, hint: 'Colours, setup times, anything the supplier should know', maxLines: 4, minLines: 3, optional: true),
+            EvField(label: 'Message', controller: _message, hint: 'Colours, setup times, anything they should know', maxLines: 4, minLines: 3, optional: true),
           ]);
         },
       ),
       bottomSheet: data.hasValue
           ? Container(
-              color: EvColors.warmWhite,
+              decoration: const BoxDecoration(color: EvColors.cream, border: Border(top: BorderSide(color: EvColors.hairline))),
               padding: EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, EvSpace.x3 + MediaQuery.paddingOf(context).bottom),
-              child: EvButton('Send request', expand: true, loading: _busy, icon: LucideIcons.send, onPressed: () => _submit(data.value!.$1)),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                // A rough idea of cost; the quotation sets the real price.
+                if (estimate > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: EvSpace.x2),
+                    child: Row(children: [
+                      Expanded(
+                        child: Text(partial ? 'Listed prices, some items on quotation' : 'At listed prices', style: EvType.small),
+                      ),
+                      Text('about ${Money.k(estimate)}', style: EvType.bodyStrong),
+                    ]),
+                  ),
+                EvButton('Send request', expand: true, loading: _busy, icon: LucideIcons.send, onPressed: () => _submit(data.value!.$1)),
+              ]),
             )
           : null,
     );
   }
+}
+
+/// One item: photo and name on the first line, price and quantity below,
+/// so long names and prices never squeeze into a column.
+class _ItemRow extends StatelessWidget {
+  const _ItemRow({required this.line, required this.onQuantity, required this.onRemove});
+  final _Line line;
+  final ValueChanged<int> onQuantity;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = line.listing;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(EvSpace.x4, EvSpace.x3, EvSpace.x2, EvSpace.x3),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          if (l != null) ...[EvPhoto(l.coverPhoto, width: 44, height: 44, radius: EvRadius.sm), const SizedBox(width: 12)],
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(line.description, style: EvType.bodyStrong, maxLines: 2, overflow: TextOverflow.ellipsis),
+              Text(l == null ? 'Your own description' : priceLabel(l), style: EvType.caption),
+            ]),
+          ),
+          IconButton(tooltip: 'Remove', icon: const Icon(LucideIcons.x, size: 18, color: EvColors.ink3), onPressed: onRemove),
+        ]),
+        const SizedBox(height: EvSpace.x2),
+        Row(children: [
+          Text('Quantity', style: EvType.small),
+          const Spacer(),
+          SizedBox(
+            width: 150,
+            child: EvQuantityStepper(value: line.quantity, min: 1, step: line.quantity >= 20 ? 10 : 1, onChanged: onQuantity),
+          ),
+          const SizedBox(width: EvSpace.x2),
+        ]),
+      ]),
+    );
+  }
+}
+
+/// A plain radio row inside a grouped list.
+class _ChoiceRow extends StatelessWidget {
+  const _ChoiceRow({required this.title, required this.selected, required this.onTap});
+  final String title;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: EvSpace.x4, vertical: 14),
+          child: Row(children: [
+            Expanded(child: Text(title, style: EvType.body)),
+            Icon(selected ? LucideIcons.circleCheck : LucideIcons.circle, size: 22, color: selected ? EvColors.forest : EvColors.sandDeep),
+          ]),
+        ),
+      );
 }
