@@ -213,11 +213,12 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
           ]),
           if (biz.verification == VerificationStatus.rejected || biz.verification == VerificationStatus.pending) _WhatToFix(biz: biz),
           const SectionHeader('Verification documents', padding: EdgeInsets.fromLTRB(0, EvSpace.x6, 0, EvSpace.x2)),
+          // A vendor can always add or replace a document, in any state: a
+          // rejected one can be fixed, and a verified business can refresh an
+          // expired certificate. Uploading never changes the verified status.
           VerificationDocsSection(
             businessId: b.id,
             types: const [...kVerificationDocTypes, ('other', 'Other document', 'Anything else that shows the business is real')],
-            locked: !_canSend(biz),
-            allowReplacingRejected: biz.verification == VerificationStatus.pending,
             onBusyChanged: (v) => setState(() => _uploading = v),
           ),
           if (_canSend(biz)) ...[
