@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -57,12 +58,29 @@ class _Body extends ConsumerStatefulWidget {
 
 class _BodyState extends ConsumerState<_Body> {
   final _page = PageController();
+  final _scroll = ScrollController();
   int _photo = 0;
+  bool _collapsed = false; // photo scrolled away: title in the bar, dark status icons
   late DateTime? _from = widget.from;
   late DateTime? _to = widget.to;
   late final int _qty = widget.qty ?? (widget.listing.tracksStock && !widget.listing.isService ? 50 : 1);
   int? _available;
   bool _checking = false;
+
+  @override
+  void dispose() {
+    _page.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _openViewer(List<String?> photos, int index) {
+    if (photos.every((p) => p == null)) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => _PhotoViewer(photos: photos, initial: index, title: widget.listing.title, heroPrefix: 'listing-photo-${widget.listing.id}'),
+    ));
+  }
 
   @override
   void initState() {
@@ -108,19 +126,41 @@ class _BodyState extends ConsumerState<_Body> {
     final following = follows.any((f) => f.supplier.id == biz.id);
     final photos = l.photos.isEmpty ? <String?>[null] : l.photos;
     final width = MediaQuery.sizeOf(context).width;
+    final expanded = (width * 0.78).clamp(240.0, 420.0);
+    final collapseAt = expanded - kToolbarHeight - MediaQuery.paddingOf(context).top;
 
-    return Stack(children: [
-      CustomScrollView(slivers: [
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      // Light status icons over the photo, dark once the bar turns cream.
+      value: _collapsed ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+      child: Stack(children: [
+      NotificationListener<ScrollNotification>(
+        onNotification: (n) {
+          final c = n.metrics.axis == Axis.vertical && n.metrics.pixels > collapseAt;
+          if (c != _collapsed) setState(() => _collapsed = c);
+          return false;
+        },
+        child: CustomScrollView(controller: _scroll, slivers: [
         SliverAppBar(
-          expandedHeight: (width * 0.78).clamp(240, 420),
+          expandedHeight: expanded,
           pinned: true,
           backgroundColor: EvColors.cream,
+          surfaceTintColor: Colors.transparent,
+          // The bar sets the status-bar style itself: light over the photo.
+          systemOverlayStyle: _collapsed ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+          // The listing's name appears in the bar once the photo has scrolled away.
+          title: AnimatedOpacity(
+            opacity: _collapsed ? 1 : 0,
+            duration: EvMotion.of(context, EvMotion.fast),
+            child: Text(l.title, style: EvType.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
           leading: Padding(
             padding: const EdgeInsets.all(6),
-            child: CircleAvatar(
-              backgroundColor: EvColors.warmWhite.withValues(alpha: 0.92),
-              child: IconButton(icon: const Icon(LucideIcons.arrowLeft, size: 20, color: EvColors.ink), onPressed: () => context.pop()),
-            ),
+            child: _collapsed
+                ? IconButton(icon: const Icon(LucideIcons.arrowLeft, color: EvColors.ink), onPressed: () => context.pop())
+                : CircleAvatar(
+                    backgroundColor: EvColors.warmWhite.withValues(alpha: 0.92),
+                    child: IconButton(icon: const Icon(LucideIcons.arrowLeft, size: 20, color: EvColors.ink), onPressed: () => context.pop()),
+                  ),
           ),
           flexibleSpace: FlexibleSpaceBar(
             background: Stack(fit: StackFit.expand, children: [
@@ -128,23 +168,35 @@ class _BodyState extends ConsumerState<_Body> {
                 controller: _page,
                 itemCount: photos.length,
                 onPageChanged: (i) => setState(() => _photo = i),
-                itemBuilder: (c, i) => EvPhoto(photos[i], radius: 0, icon: categoryIcon(l.categoryId)),
+                itemBuilder: (c, i) => GestureDetector(
+                  onTap: () => _openViewer(photos, i),
+                  child: Hero(tag: 'listing-photo-${l.id}-$i', child: EvPhoto(photos[i], radius: 0, icon: categoryIcon(l.categoryId))),
+                ),
+              ),
+              // A soft fade at the top keeps the status bar and back button readable.
+              const IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment(0, -0.25),
+                      colors: [Color(0x8C000000), Color(0x00000000)],
+                    ),
+                  ),
+                ),
               ),
               if (photos.length > 1)
                 Positioned(
+                  right: EvSpace.gutter,
                   bottom: 14,
-                  left: 0,
-                  right: 0,
-                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    for (var i = 0; i < photos.length; i++)
-                      AnimatedContainer(
-                        duration: EvMotion.of(context, EvMotion.fast),
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        width: i == _photo ? 18 : 6,
-                        height: 6,
-                        decoration: BoxDecoration(color: EvColors.warmWhite.withValues(alpha: i == _photo ? 1 : 0.6), borderRadius: BorderRadius.circular(3)),
-                      ),
-                  ]),
+                  child: IgnorePointer(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: const Color(0x99171A18), borderRadius: BorderRadius.circular(99)),
+                      child: Text('${_photo + 1} / ${photos.length}',
+                          style: EvType.caption.copyWith(color: EvColors.inkOnDark, fontWeight: FontWeight.w600, fontFeatures: const [FontFeature.tabularFigures()])),
+                    ),
+                  ),
                 ),
             ]),
           ),
@@ -154,7 +206,7 @@ class _BodyState extends ConsumerState<_Body> {
             padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x5, EvSpace.gutter, 0),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Text(categoryById(l.categoryId).name.toUpperCase(), style: EvType.overline),
+                Text(categoryById(l.categoryId).name, style: EvType.smallStrong.copyWith(color: EvColors.ink2)),
                 if (l.condition != null) ...[const SizedBox(width: 8), Text('· ${l.condition![0].toUpperCase()}${l.condition!.substring(1)} condition', style: EvType.caption)],
                 if (mine) ...[const Spacer(), StatusPill(l.status.label, tone: toneForListing(l.status), dense: true)],
               ]),
@@ -240,7 +292,7 @@ class _BodyState extends ConsumerState<_Body> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x6, EvSpace.gutter, 0),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('ABOUT', style: EvType.overline),
+                Text('About', style: EvType.headline.copyWith(fontSize: 16)),
                 const SizedBox(height: 8),
                 Text(l.description, style: EvType.body.copyWith(height: 1.55)),
               ]),
@@ -251,7 +303,7 @@ class _BodyState extends ConsumerState<_Body> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x5, EvSpace.gutter, 0),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('INCLUDED', style: EvType.overline),
+                Text('Included', style: EvType.headline.copyWith(fontSize: 16)),
                 for (final p in l.packageItems)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -265,7 +317,7 @@ class _BodyState extends ConsumerState<_Body> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x5, EvSpace.gutter, 0),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('HIRE TERMS', style: EvType.overline),
+                Text('Hire terms', style: EvType.headline.copyWith(fontSize: 16)),
                 const SizedBox(height: 8),
                 Text(l.terms, style: EvType.small.copyWith(height: 1.5)),
               ]),
@@ -273,6 +325,7 @@ class _BodyState extends ConsumerState<_Body> {
           ),
         const SliverToBoxAdapter(child: SizedBox(height: 120)),
       ]),
+      ),
 
       // Sticky action bar
       Positioned(
@@ -308,7 +361,8 @@ class _BodyState extends ConsumerState<_Body> {
                 ]),
         ),
       ),
-    ]);
+    ]),
+    );
   }
 }
 
@@ -344,3 +398,72 @@ class _AvailabilityResult extends StatelessWidget {
   }
 }
 
+
+
+/// Full-screen photos, as big apps do it: black, swipe between photos, pinch to
+/// zoom, a "2 / 5" counter and a close button.
+class _PhotoViewer extends StatefulWidget {
+  const _PhotoViewer({required this.photos, required this.initial, required this.title, required this.heroPrefix});
+  final String heroPrefix;
+  final List<String?> photos;
+  final int initial;
+  final String title;
+
+  @override
+  State<_PhotoViewer> createState() => _PhotoViewerState();
+}
+
+class _PhotoViewerState extends State<_PhotoViewer> {
+  late final _page = PageController(initialPage: widget.initial);
+  late int _index = widget.initial;
+
+  @override
+  void dispose() {
+    _page.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light,
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(children: [
+            PageView.builder(
+              controller: _page,
+              itemCount: widget.photos.length,
+              onPageChanged: (i) => setState(() => _index = i),
+              itemBuilder: (_, i) => InteractiveViewer(
+                maxScale: 4,
+                child: Center(
+                  child: Hero(
+                    tag: '${widget.heroPrefix}-$i',
+                    child: EvPhoto(widget.photos[i], radius: 0, fit: BoxFit.contain),
+                  ),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(children: [
+                  IconButton(
+                    tooltip: 'Close',
+                    icon: const Icon(LucideIcons.x, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  Expanded(
+                    child: Text(widget.title, style: EvType.bodyStrong.copyWith(color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                  if (widget.photos.length > 1)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Text('${_index + 1} / ${widget.photos.length}', style: EvType.small.copyWith(color: Colors.white70)),
+                    ),
+                ]),
+              ),
+            ),
+          ]),
+        ),
+      );
+}
