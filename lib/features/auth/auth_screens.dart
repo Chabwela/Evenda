@@ -184,7 +184,7 @@ class _AuthFrame extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: context.canPop()
-            ? IconButton(onPressed: () => context.pop(), icon: Icon(LucideIcons.arrowLeft, color: EvColors.ink))
+            ? IconButton(tooltip: 'Back', onPressed: () => context.pop(), icon: Icon(LucideIcons.arrowLeft, color: EvColors.ink))
             : null,
         automaticallyImplyLeading: false,
       ),

@@ -94,9 +94,12 @@ class _NowRespondScreenState extends ConsumerState<NowRespondScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(r.requester.name, style: EvType.headline),
                   Text('${it.distanceKm} km from you · asked ${EvDates.ago(r.createdAt)}', style: EvType.small),
+                  if (open) ...[
+                    const SizedBox(height: 6),
+                    Text(_closesIn(r.expiresAt), style: EvType.smallStrong.copyWith(color: EvColors.bronzeDeep)),
+                  ],
                 ]),
               ),
-              StatusPill(r.status.label, tone: toneForNow(r.status), dense: true),
             ]),
             const SizedBox(height: EvSpace.x4),
             Text('${r.quantity} × ${r.itemDescription}', style: EvType.display),
@@ -229,4 +232,12 @@ class _NowRespondScreenState extends ConsumerState<NowRespondScreen> {
           : null,
     );
   }
+}
+
+/// "Closes in 3 h 40 min": the deadline is what a supplier needs to know.
+String _closesIn(DateTime at) {
+  final d = at.difference(DateTime.now());
+  if (d.inMinutes < 1) return 'Closing now';
+  final h = d.inHours, m = d.inMinutes % 60;
+  return 'Closes in ${h > 0 ? '$h h ' : ''}$m min';
 }

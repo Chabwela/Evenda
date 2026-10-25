@@ -627,7 +627,8 @@ class _Quick extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.center,
-              maxLines: 1,
+              // Two lines at large text ("Record a / job"), never cut off.
+              maxLines: 2,
             ),
           ],
         ),

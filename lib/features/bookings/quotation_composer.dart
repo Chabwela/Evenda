@@ -126,7 +126,7 @@ class _QuotationComposerScreenState extends ConsumerState<QuotationComposerScree
           return ListView(padding: const EdgeInsets.fromLTRB(EvSpace.gutter, 0, EvSpace.gutter, 160), children: [
             Text('For ${q.requester.name} · ${EvDates.range(q.neededFrom, q.neededTo)}', style: EvType.small),
             const SizedBox(height: EvSpace.x4),
-            Text('LINE ITEMS', style: EvType.overline),
+            Text('Line items', style: EvType.headline.copyWith(fontSize: 16)),
             const SizedBox(height: EvSpace.x2),
             for (final (i, line) in _lines.indexed) ...[
               _LineEditor(
@@ -142,7 +142,7 @@ class _QuotationComposerScreenState extends ConsumerState<QuotationComposerScree
             ],
             const SizedBox(height: EvSpace.x3),
             Row(children: [
-              Text('EXTRA CHARGES', style: EvType.overline),
+              Text('Extra charges', style: EvType.headline.copyWith(fontSize: 16)),
               const Spacer(),
               TextButton.icon(
                 onPressed: () => setState(() => _charges.add((TextEditingController(), TextEditingController()))),
@@ -166,7 +166,7 @@ class _QuotationComposerScreenState extends ConsumerState<QuotationComposerScree
                       onChanged: (_) => setState(() {}),
                     ),
                   ),
-                  IconButton(icon: const Icon(LucideIcons.x, size: 18), onPressed: () => setState(() => _charges.removeAt(i))),
+                  IconButton(tooltip: 'Remove charge', icon: const Icon(LucideIcons.x, size: 18), onPressed: () => setState(() => _charges.removeAt(i))),
                 ]),
               ),
             const SizedBox(height: EvSpace.x4),
@@ -239,6 +239,8 @@ class _LineEditor extends StatelessWidget {
             child: TextFormField(
               initialValue: line.description,
               style: EvType.bodyStrong,
+              minLines: 1,
+              maxLines: 2,
               decoration: const InputDecoration(isDense: true, border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none, filled: false, contentPadding: EdgeInsets.zero),
               onChanged: (v) {
                 line.description = v;
@@ -246,7 +248,7 @@ class _LineEditor extends StatelessWidget {
               },
             ),
           ),
-          if (onRemove != null) IconButton(icon: Icon(LucideIcons.x, size: 18, color: EvColors.ink3), onPressed: onRemove, visualDensity: VisualDensity.compact),
+          if (onRemove != null) IconButton(tooltip: 'Remove line', icon: Icon(LucideIcons.x, size: 18, color: EvColors.ink3), onPressed: onRemove, visualDensity: VisualDensity.compact),
         ]),
         const SizedBox(height: 8),
         Row(children: [
@@ -255,27 +257,35 @@ class _LineEditor extends StatelessWidget {
           Expanded(child: _num('Unit (K)', line.unitPrice.toStringAsFixed(line.unitPrice % 1 == 0 ? 0 : 2), (v) => line.unitPrice = double.tryParse(v) ?? 0, decimal: true)),
           const SizedBox(width: 8),
           Expanded(child: _num('Days', '${line.days}', (v) => line.days = (int.tryParse(v) ?? 1).clamp(1, 60))),
-          const SizedBox(width: 12),
-          SizedBox(width: 82, child: Text(Money.k(line.total), style: EvType.money, textAlign: TextAlign.right)),
         ]),
+        const SizedBox(height: 8),
+        Align(alignment: Alignment.centerRight, child: Text(Money.k(line.total), style: EvType.money)),
         if (line.available != null) ...[
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: short ? EvColors.warningTint : EvColors.successTint, borderRadius: EvRadius.smAll),
-            child: Row(children: [
-              Icon(short ? LucideIcons.triangleAlert : LucideIcons.circleCheck, size: 16, color: short ? EvColors.warning : EvColors.success),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  short
-                      ? 'You have ${line.available} free on these dates — ${line.quantity - line.available!} short.'
-                      : 'You have ${line.available} free on these dates.',
-                  style: EvType.small.copyWith(color: short ? EvColors.warning : EvColors.success, fontWeight: FontWeight.w600),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(short ? LucideIcons.triangleAlert : LucideIcons.circleCheck, size: 16, color: short ? EvColors.warning : EvColors.success),
                 ),
-              ),
-              if (onSource != null)
-                TextButton(onPressed: onSource, style: TextButton.styleFrom(visualDensity: VisualDensity.compact), child: const Text('Source the rest')),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    short
+                        ? '${line.available} free on these dates, ${line.quantity - line.available!} short.'
+                        : '${line.available} free on these dates.',
+                    style: EvType.small.copyWith(color: short ? EvColors.warning : EvColors.success, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ]),
+              if (short && onSource != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: TextButton(onPressed: onSource, style: TextButton.styleFrom(visualDensity: VisualDensity.compact), child: const Text('Source the rest')),
+                ),
             ]),
           ),
         ],

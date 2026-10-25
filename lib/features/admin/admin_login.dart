@@ -37,33 +37,37 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: ListView(shrinkWrap: true, padding: const EdgeInsets.all(EvSpace.gutter), children: [
-            const Align(alignment: Alignment.centerLeft, child: EvendaLogo(size: 30)),
-            const SizedBox(height: EvSpace.x4),
+            const Align(alignment: Alignment.centerLeft, child: EvendaLogo(size: 24)),
+            const SizedBox(height: EvSpace.x8),
             Text('Platform administration', style: EvType.display),
             const SizedBox(height: EvSpace.x2),
             Text('For Evenda staff. Access is granted by an administrator and every action is recorded.', style: EvType.small),
             const SizedBox(height: EvSpace.x6),
-            EvSurface(
-              padding: const EdgeInsets.all(EvSpace.x5),
-              child: AutofillGroup(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  EvField(label: 'Work email', controller: _email, keyboardType: TextInputType.emailAddress, textCapitalization: TextCapitalization.none, prefixIcon: LucideIcons.mail),
-                  const SizedBox(height: EvSpace.x4),
-                  const EvFieldLabel('Password'),
-                  TextField(
-                    controller: _password,
-                    obscureText: _obscure,
-                    autofillHints: const [AutofillHints.password],
-                    onSubmitted: (_) => _signIn(),
-                    decoration: InputDecoration(
-                      prefixIcon: Icon(LucideIcons.keyRound, size: 18, color: EvColors.ink3),
-                      suffixIcon: IconButton(icon: Icon(_obscure ? LucideIcons.eye : LucideIcons.eyeOff, size: 18), onPressed: () => setState(() => _obscure = !_obscure)),
-                    ),
+            // Same form treatment as the vendor sign-in: on the page, no card.
+            AutofillGroup(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                EvField(
+                  label: 'Work email',
+                  controller: _email,
+                  keyboardType: TextInputType.emailAddress,
+                  textCapitalization: TextCapitalization.none,
+                  autofillHints: const [AutofillHints.email, AutofillHints.username],
+                  autocorrect: false,
+                ),
+                const SizedBox(height: EvSpace.x4),
+                const EvFieldLabel('Password'),
+                TextField(
+                  controller: _password,
+                  obscureText: _obscure,
+                  autofillHints: const [AutofillHints.password],
+                  onSubmitted: (_) => _signIn(),
+                  decoration: InputDecoration(
+                    suffixIcon: IconButton(tooltip: _obscure ? 'Show password' : 'Hide password', icon: Icon(_obscure ? LucideIcons.eye : LucideIcons.eyeOff, size: 18), onPressed: () => setState(() => _obscure = !_obscure)),
                   ),
-                  const SizedBox(height: EvSpace.x5),
-                  EvButton('Sign in', expand: true, loading: _busy, onPressed: _signIn),
-                ]),
-              ),
+                ),
+                const SizedBox(height: EvSpace.x6),
+                EvButton('Sign in', expand: true, loading: _busy, onPressed: _signIn),
+              ]),
             ),
           ]),
         ),

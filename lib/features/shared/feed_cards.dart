@@ -95,7 +95,7 @@ class ListingResultCard extends StatelessWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 112),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Text(categoryById(l.categoryId).name.toUpperCase(), style: EvType.overline.copyWith(fontSize: 10)),
+                Text(categoryById(l.categoryId).name, style: EvType.caption.copyWith(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
                 Text(l.title, style: EvType.headline.copyWith(fontSize: 16), maxLines: 2, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 4),

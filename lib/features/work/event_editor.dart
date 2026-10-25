@@ -237,7 +237,7 @@ class _EventEditorScreenState extends ConsumerState<EventEditorScreen> {
                 ]),
                 const SizedBox(height: EvSpace.x6),
                 Row(children: [
-                  Text('WHO SUPPLIES WHAT', style: EvType.overline),
+                  Text('Who supplies what', style: EvType.headline.copyWith(fontSize: 16)),
                   const Spacer(),
                   TextButton.icon(onPressed: _editRequirement, icon: const Icon(LucideIcons.plus, size: 16), label: const Text('Add')),
                 ]),
@@ -254,7 +254,7 @@ class _EventEditorScreenState extends ConsumerState<EventEditorScreen> {
                         leading: IconTile(responsibilityIcon(q.responsibility), tone: responsibilityTone(q.responsibility), size: 32),
                         title: '${q.label}${q.quantity != null ? ' · ${q.quantity}' : ''}',
                         subtitle: q.supplierName ?? q.responsibility.label,
-                        trailing: IconButton(icon: const Icon(LucideIcons.x, size: 16), onPressed: () => setState(() => d.requirements.removeAt(i))),
+                        trailing: IconButton(tooltip: 'Remove', icon: const Icon(LucideIcons.x, size: 16), onPressed: () => setState(() => d.requirements.removeAt(i))),
                         onTap: () => _editRequirement(i),
                       ),
                     ),

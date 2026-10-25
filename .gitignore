@@ -51,3 +51,9 @@ app.*.map.json
 .env
 .env.*
 supabase/.temp/
+
+# UI audit output (regenerate with flutter test test/_audit --dart-define=AUDIT=true --update-goldens)
+test/_audit/shots/
+test/_audit/before/
+test/_audit/compare/
+test/_audit/sheets/

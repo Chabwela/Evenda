@@ -156,10 +156,10 @@ class _BodyState extends ConsumerState<_Body> {
           leading: Padding(
             padding: const EdgeInsets.all(6),
             child: _collapsed
-                ? IconButton(icon: Icon(LucideIcons.arrowLeft, color: EvColors.ink), onPressed: () => context.pop())
+                ? IconButton(tooltip: 'Back', icon: Icon(LucideIcons.arrowLeft, color: EvColors.ink), onPressed: () => context.pop())
                 : CircleAvatar(
                     backgroundColor: EvColors.warmWhite.withValues(alpha: 0.92),
-                    child: IconButton(icon: Icon(LucideIcons.arrowLeft, size: 20, color: EvColors.ink), onPressed: () => context.pop()),
+                    child: IconButton(tooltip: 'Back', icon: Icon(LucideIcons.arrowLeft, size: 20, color: EvColors.ink), onPressed: () => context.pop()),
                   ),
           ),
           flexibleSpace: FlexibleSpaceBar(

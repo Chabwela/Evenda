@@ -215,7 +215,7 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
           ? Container(
               color: EvColors.warmWhite,
               padding: EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, EvSpace.x3 + MediaQuery.paddingOf(context).bottom),
-              child: EvButton('Record a job taken outside Evenda', icon: LucideIcons.notebookPen, expand: true, onPressed: () {
+              child: EvButton('Record an outside job', icon: LucideIcons.notebookPen, expand: true, onPressed: () {
                 final listings = listingsAsync.value!.where((x) => x.tracksStock && x.status != ListingStatus.archived).toList();
                 final current = listings.firstWhere((l) => l.id == (_listingId ?? widget.listingId), orElse: () => listings.first);
                 _recordJob(listings, current);

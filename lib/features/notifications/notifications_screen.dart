@@ -66,7 +66,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         title: const Text('Notifications'),
         actions: [
           if (all.any((n) => n.unread))
-            TextButton(onPressed: () => ref.read(backendProvider).notifications.markAllRead(ref.read(bizIdProvider)), child: const Text('Mark all read')),
+            IconButton(tooltip: 'Mark all read', icon: const Icon(LucideIcons.checkCheck), onPressed: () => ref.read(backendProvider).notifications.markAllRead(ref.read(bizIdProvider))),
           EvIconButton(LucideIcons.settings, tooltip: 'Settings', onPressed: () => context.push('/business/notifications')),
           const SizedBox(width: 4),
         ],

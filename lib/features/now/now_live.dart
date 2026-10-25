@@ -494,8 +494,8 @@ class _NowLiveScreenState extends ConsumerState<NowLiveScreen> with TickerProvid
               Padding(
                 padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x2, EvSpace.x2, 0),
                 child: Row(children: [
-                  Text(pending.isEmpty ? 'WAITING FOR OFFERS' : 'OFFERS', style: EvType.overline),
-                  if (pending.isNotEmpty) Text('  ${pending.length}', style: EvType.overline.copyWith(color: EvColors.bronze)),
+                  Text(pending.isEmpty ? 'Waiting for offers' : 'Offers', style: EvType.headline.copyWith(fontSize: 16)),
+                  if (pending.isNotEmpty) Text('  ${pending.length}', style: EvType.headline.copyWith(fontSize: 16).copyWith(color: EvColors.ink3, fontWeight: FontWeight.w500)),
                   const Spacer(),
                   if (pending.length > 1)
                     TextButton(onPressed: () => setState(() => _sortByPrice = !_sortByPrice), child: Text(_sortByPrice ? 'Cheapest first' : 'Nearest first')),

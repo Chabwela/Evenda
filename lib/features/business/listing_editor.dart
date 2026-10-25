@@ -210,7 +210,7 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
           }),
           if (_showItem) ...[
           // Photos
-          Text(_isService ? 'PORTFOLIO' : 'PHOTOS', style: EvType.overline),
+          Text(_isService ? 'Portfolio' : 'Photos', style: EvType.smallStrong.copyWith(color: EvColors.ink2)),
           const SizedBox(height: EvSpace.x2),
           SizedBox(
             height: 96,
@@ -402,11 +402,11 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
                 onPressed: () => _save(_original?.status ?? ListingStatus.draft))
             : Row(children: [
                 if (_original == null || _original!.status != ListingStatus.published) ...[
-                  Expanded(child: EvButton('Save, don’t show', kind: EvButtonKind.secondary, onPressed: _busy ? null : () => _save(ListingStatus.draft))),
+                  Expanded(child: EvButton('Save draft', kind: EvButtonKind.secondary, onPressed: _busy ? null : () => _save(ListingStatus.draft))),
                   const SizedBox(width: 10),
                 ],
                 Expanded(
-                  child: EvButton(_original?.status == ListingStatus.published ? 'Save changes' : 'Show on marketplace', expand: true, loading: _busy, icon: LucideIcons.store,
+                  child: EvButton(_original?.status == ListingStatus.published ? 'Save changes' : 'List it', expand: true, loading: _busy, icon: LucideIcons.store,
                       onPressed: () => _save(ListingStatus.published)),
                 ),
               ]),
@@ -436,7 +436,7 @@ class _ItemSummary extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('FROM MY STOCK', style: EvType.overline.copyWith(color: EvColors.forest)),
+                Text('From my stock', style: EvType.smallStrong.copyWith(color: EvColors.forest)),
                 Text(l.title, style: EvType.bodyStrong, maxLines: 2, overflow: TextOverflow.ellipsis),
                 Text('${l.totalQuantity} owned · ${l.usable} in service · ${l.photos.length} photo${l.photos.length == 1 ? '' : 's'}', style: EvType.caption),
               ]),

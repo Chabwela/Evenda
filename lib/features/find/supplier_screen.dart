@@ -78,7 +78,7 @@ class SupplierScreen extends ConsumerWidget {
                 Row(children: [
                   if (id != myId)
                     Expanded(
-                      child: EvButton(follow != null ? (follow.muted ? 'Following (muted)' : 'Following') : 'Follow updates',
+                      child: EvButton(follow != null ? (follow.muted ? 'Following (muted)' : 'Following') : 'Follow',
                           kind: follow != null ? EvButtonKind.secondary : EvButtonKind.primary,
                           icon: follow != null ? LucideIcons.check : LucideIcons.bookmark,
                           onPressed: follow != null ? null : () => guard(context, () => d.follow(myId, id), success: 'You’ll be told when ${b.name} adds stock')),

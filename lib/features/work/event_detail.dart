@@ -57,7 +57,7 @@ class EventDetailScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: EvSpace.gutter),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(e.type.label.toUpperCase(), style: EvType.overline),
+                Text(e.type.label, style: EvType.smallStrong.copyWith(color: EvColors.ink2)),
                 const SizedBox(height: 4),
                 Text(e.name, style: EvType.display),
                 const SizedBox(height: EvSpace.x3),
@@ -105,12 +105,14 @@ class EventDetailScreen extends ConsumerWidget {
                     : q.responsibility == Responsibility.self
                         ? (q.bookingId != null ? 'Your business · arranged' : 'Your business · to arrange')
                         : q.responsibility.label,
-                trailing: (q.responsibility == Responsibility.self && q.bookingId == null) || q.responsibility == Responsibility.unassigned
-                    ? TextButton(
-                        onPressed: () => context.push('/find${q.categoryId != null ? '?category=${q.categoryId}' : ''}'),
-                        child: const Text('Find supplier'),
+                // The action sits under the text so the requirement keeps the full width.
+                meta: (q.responsibility == Responsibility.self && q.bookingId == null) || q.responsibility == Responsibility.unassigned
+                    ? GestureDetector(
+                        onTap: () => context.push('/find${q.categoryId != null ? '?category=${q.categoryId}' : ''}'),
+                        child: Text('Find a supplier →', style: EvType.smallStrong.copyWith(color: EvColors.forest)),
                       )
-                    : const SizedBox.shrink(),
+                    : null,
+                trailing: const SizedBox.shrink(),
               ),
             ],
 

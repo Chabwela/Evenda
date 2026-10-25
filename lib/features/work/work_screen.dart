@@ -222,9 +222,9 @@ class _TaskGroupState extends State<_TaskGroup> {
           padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x5, EvSpace.x4, EvSpace.x2),
           child: Row(children: [
             if (widget.icon != null) ...[Icon(widget.icon, size: 14, color: widget.tone.fg), const SizedBox(width: 6)],
-            Text(widget.title.toUpperCase(), style: EvType.overline.copyWith(color: widget.tone == Tone.critical ? EvColors.danger : EvColors.ink3)),
+            Text(widget.title, style: EvType.smallStrong.copyWith(color: widget.tone == Tone.critical ? EvColors.danger : EvColors.ink2)),
             const SizedBox(width: 6),
-            Text('${widget.tasks.length}', style: EvType.overline.copyWith(color: EvColors.bronze)),
+            Text('${widget.tasks.length}', style: EvType.smallStrong.copyWith(color: EvColors.ink3, fontWeight: FontWeight.w500)),
             const Spacer(),
             AnimatedRotation(
               turns: _open ? 0 : -0.25,

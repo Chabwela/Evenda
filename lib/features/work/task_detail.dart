@@ -125,7 +125,7 @@ class TaskDetailScreen extends ConsumerWidget {
               Row(children: [
                 Expanded(child: EvButton('Snooze', kind: EvButtonKind.secondary, icon: LucideIcons.alarmClock, onPressed: () => _snooze(context, ref, t))),
                 const SizedBox(width: 8),
-                Expanded(child: EvButton('Reschedule', kind: EvButtonKind.secondary, icon: LucideIcons.calendarClock, onPressed: () => _reschedule(context, ref, t))),
+                Expanded(child: EvButton('Move', kind: EvButtonKind.secondary, icon: LucideIcons.calendarClock, onPressed: () => _reschedule(context, ref, t))),
               ]),
               const SizedBox(height: EvSpace.x2),
               EvButton('No longer needed', kind: EvButtonKind.quiet, expand: true,

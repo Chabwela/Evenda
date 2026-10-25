@@ -167,7 +167,7 @@ class _FindScreenState extends ConsumerState<FindScreen> {
               prefixIcon: Icon(LucideIcons.search, size: 18, color: EvColors.ink3),
               suffixIcon: _text.text.isEmpty
                   ? null
-                  : IconButton(icon: const Icon(LucideIcons.x, size: 18), onPressed: () {
+                  : IconButton(tooltip: 'Clear search', icon: const Icon(LucideIcons.x, size: 18), onPressed: () {
                       _text.clear();
                       _set(_q.copyWith(text: ''));
                     }),

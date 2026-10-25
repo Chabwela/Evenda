@@ -1336,9 +1336,9 @@ class _Categories extends ConsumerWidget {
                   child: Row(children: [
                     Icon(icon, size: 16, color: EvColors.forest),
                     const SizedBox(width: 6),
-                    Text(title.toUpperCase(), style: EvType.overline.copyWith(color: EvColors.forest)),
+                    Text(title, style: EvType.headline.copyWith(fontSize: 16)),
                     const SizedBox(width: 6),
-                    Text('${all.where((c) => c.kind == kind && c.active).length}', style: EvType.overline.copyWith(color: EvColors.bronze)),
+                    Text('${all.where((c) => c.kind == kind && c.active).length}', style: EvType.headline.copyWith(fontSize: 16).copyWith(color: EvColors.ink3, fontWeight: FontWeight.w500)),
                   ]),
                 ),
                 for (final c in all.where((c) => c.kind == kind)) ...[
@@ -1618,7 +1618,7 @@ void _previewListing(BuildContext context, Listing l) {
         if (l.description.isNotEmpty) ...[const SizedBox(height: EvSpace.x3), Text(l.description, style: EvType.body)],
         if (l.terms.isNotEmpty) ...[
           const SizedBox(height: EvSpace.x3),
-          Text('TERMS', style: EvType.overline),
+          Text('Terms', style: EvType.smallStrong.copyWith(color: EvColors.ink2)),
           Text(l.terms, style: EvType.small),
         ],
         if (l.moderationReason != null) ...[

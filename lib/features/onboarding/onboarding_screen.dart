@@ -201,7 +201,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          leading: _step > 0 ? IconButton(icon: const Icon(LucideIcons.arrowLeft), onPressed: () => setState(() => _step--)) : null,
+          leading: _step > 0 ? IconButton(tooltip: 'Back', icon: const Icon(LucideIcons.arrowLeft), onPressed: () => setState(() => _step--)) : null,
           automaticallyImplyLeading: false,
           title: Text('Step ${_step + 1} of 6', style: EvType.small),
           actions: [

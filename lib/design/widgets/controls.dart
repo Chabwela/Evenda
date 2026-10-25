@@ -43,7 +43,8 @@ class EvButton extends StatelessWidget {
               children: [
                 if (icon != null) Icon(icon, size: 18),
                 if (icon != null && label.isNotEmpty) const SizedBox(width: 8),
-                if (label.isNotEmpty) Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+                // Shrinks a little to fit rather than cutting the label off ("Resched…").
+                if (label.isNotEmpty) Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1))),
               ],
             ),
     );
@@ -374,7 +375,8 @@ class _EvQuantityStepperState extends State<EvQuantityStepper> {
                 final v = int.tryParse(s);
                 if (v != null) widget.onChanged(v.clamp(widget.min, widget.max ?? 1 << 30));
               },
-              decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(vertical: 11)),
+              // No side padding: at large text "300" was clipped to "30".
+              decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 13, horizontal: 2)),
             ),
           ),
           const SizedBox(width: 8),

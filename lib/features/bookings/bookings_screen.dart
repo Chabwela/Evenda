@@ -163,11 +163,10 @@ class RequestRow extends StatelessWidget {
           Flexible(child: Text('${incoming ? 'To you' : 'You asked'} · ${EvDates.range(q.neededFrom, q.neededTo)}', style: EvType.caption, maxLines: 1, overflow: TextOverflow.ellipsis)),
         ]),
         if (waitingOnMe) Text('Your move', style: EvType.caption.copyWith(color: EvColors.bronzeDeep, fontWeight: FontWeight.w700)),
-      ]),
-      trailing: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
         StatusPill(q.status.label, tone: toneForRequest(q.status), dense: true),
-        if (quote != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(Money.k(quote.total), style: EvType.money.copyWith(fontSize: 13))),
       ]),
+      // Only the amount on the right, so names keep the row's width.
+      trailing: quote == null ? null : Text(Money.k(quote.total), style: EvType.money.copyWith(fontSize: 13)),
       onTap: () => context.push('/bookings/request/${q.id}'),
     );
   }

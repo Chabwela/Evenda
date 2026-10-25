@@ -166,9 +166,11 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(other.name, style: EvType.headline),
                       Text(asSupplier ? 'Asked you for a quotation' : 'Supplier you asked', style: EvType.small),
+                      // Under the name, so long names keep the full width.
+                      const SizedBox(height: 6),
+                      StatusPill(q.status.label, tone: toneForRequest(q.status), dense: true),
                     ]),
                   ),
-                  StatusPill(q.status.label, tone: toneForRequest(q.status)),
                 ]),
                 const SizedBox(height: EvSpace.x4),
                 _RequestCard(request: q),
@@ -214,7 +216,7 @@ class _RequestCard extends StatelessWidget {
     return EvSurface(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Text('REQUEST', style: EvType.overline),
+          Text('Request', style: EvType.smallStrong.copyWith(color: EvColors.ink2)),
           const Spacer(),
           Text(EvDates.ago(q.createdAt), style: EvType.caption),
         ]),

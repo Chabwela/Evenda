@@ -48,7 +48,7 @@ void main() {
   testWidgets('Stock item: photos, name and quantity; no pricing', (t) async {
     final b = await open(t, ListingEditorMode.item);
     expect(find.text('Stock item'), findsOneWidget);
-    expect(find.text('PHOTOS'), findsOneWidget);
+    expect(find.text('Photos'), findsOneWidget);
     expect(find.text('Save item'), findsOneWidget);
     expect(await has(t, find.text('Total you own')), isTrue);
     expect(find.text('Pricing'), findsNothing);
@@ -60,8 +60,8 @@ void main() {
 
   testWidgets('Marketplace listing: price, offer quantity, terms; photos stay in My stock', (t) async {
     final b = await open(t, ListingEditorMode.offer);
-    expect(find.text('FROM MY STOCK'), findsOneWidget);
-    expect(find.text('PHOTOS'), findsNothing);
+    expect(find.text('From my stock'), findsOneWidget);
+    expect(find.text('Photos'), findsNothing);
     expect(find.text('Pricing'), findsOneWidget);
     expect(await has(t, find.text('Offer everything in service')), isTrue);
     expect(find.text('Total you own'), findsNothing);
