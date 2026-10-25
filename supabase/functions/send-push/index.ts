@@ -90,6 +90,12 @@ function activity(item: Claimed): boolean {
   return item.data.category === "booking";
 }
 
+// Verification results and new listings from followed suppliers: pop up on the
+// app's "Account and supplier updates" channel.
+function updates(item: Claimed): boolean {
+  return item.data.category === "system" || item.data.category === "inventory";
+}
+
 // A new Evenda Now request for a supplier (route /now/respond/<id>).
 function nowRequest(item: Claimed): boolean {
   return typeof item.data.route === "string" && item.data.route.startsWith("/now/respond/");
@@ -127,6 +133,8 @@ async function sendOne(sa: ServiceAccount, token: string, item: Claimed): Promis
           ? { priority: "HIGH", notification: { channel_id: "evenda_urgent_v2", sound: "evenda_urgent", tag: String(item.data.notification_id ?? ""), notification_count: unread(item) } }
           : activity(item)
           ? { priority: "HIGH", notification: { channel_id: "evenda_activity_v1", sound: "evenda_chime", tag: String(item.data.notification_id ?? ""), notification_count: unread(item) } }
+          : updates(item)
+          ? { priority: "HIGH", notification: { channel_id: "evenda_updates_v1", sound: "evenda_chime", tag: String(item.data.notification_id ?? ""), notification_count: unread(item) } }
           : { priority: "NORMAL", notification: { channel_id: "evenda_default_v2", sound: "evenda_chime", tag: String(item.data.notification_id ?? ""), notification_count: unread(item) } },
         apns: { payload: { aps: { sound: "default", badge: unread(item) ?? 0, ...(urgent(item) ? { "interruption-level": "time-sensitive" } : {}) } } },
       },

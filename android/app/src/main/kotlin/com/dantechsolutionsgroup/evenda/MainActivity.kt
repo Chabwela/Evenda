@@ -163,7 +163,9 @@ class MainActivity : FlutterActivity() {
      *                      High importance (pops up) with the longer Evenda alert.
      *  evenda_activity_v1 — quote requests, quotations, bookings and payments.
      *                      High importance (pops up) with the short Evenda chime.
-     *  evenda_default_v2 — reminders and supplier updates, with the chime.
+     *  evenda_updates_v1  — verification results and new listings from followed
+     *                      suppliers. High importance (pops up), chime.
+     *  evenda_default_v2 — task reminders and quiet background updates, chime.
      * Android fixes a channel's sound when it is created, so changing a sound
      * means a new channel ID (and deleting the old one).
      */
@@ -196,8 +198,15 @@ class MainActivity : FlutterActivity() {
             }
         )
         manager.createNotificationChannel(
-            NotificationChannel("evenda_default_v2", "Reminders and updates", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Task reminders and supplier updates"
+            NotificationChannel("evenda_updates_v1", "Account and supplier updates", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Verification results and new listings from suppliers you follow"
+                setSound(sound("evenda_chime"), audio)
+                enableVibration(true)
+            }
+        )
+        manager.createNotificationChannel(
+            NotificationChannel("evenda_default_v2", "Reminders", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Task reminders and quiet background updates"
                 setSound(sound("evenda_chime"), audio)
             }
         )
