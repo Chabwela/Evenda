@@ -498,7 +498,7 @@ class _NowLiveScreenState extends ConsumerState<NowLiveScreen> with TickerProvid
                   if (pending.isNotEmpty) Text('  ${pending.length}', style: EvType.headline.copyWith(fontSize: 16).copyWith(color: EvColors.ink3, fontWeight: FontWeight.w500)),
                   const Spacer(),
                   if (pending.length > 1)
-                    TextButton(onPressed: () => setState(() => _sortByPrice = !_sortByPrice), child: Text(_sortByPrice ? 'Cheapest first' : 'Nearest first')),
+                    TextButton(onPressed: () => setState(() => _sortByPrice = !_sortByPrice), child: Text(_sortByPrice ? 'Lowest price first' : 'Nearest first')),
                 ]),
               ),
               if (pending.isEmpty)
@@ -617,8 +617,10 @@ class _OfferCard extends StatelessWidget {
               ]),
             ),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text(Money.k(o.total), style: EvType.money.copyWith(fontSize: 16, color: overBudget ? EvColors.warning : EvColors.ink)),
-              Text('${Money.k(o.unitPrice)} each', style: EvType.caption),
+              // Price per item leads: it's the fair comparison between offers
+              // that cover different quantities. The total follows with its quantity.
+              Text('${Money.k(o.unitPrice)} each', style: EvType.money.copyWith(fontSize: 16)),
+              Text('${Money.k(o.total)} for ${o.quantity}', style: EvType.caption.copyWith(color: overBudget ? EvColors.warning : null)),
             ]),
           ]),
           const SizedBox(height: 8),

@@ -150,15 +150,19 @@ class _BodyState extends ConsumerState<_Body> {
                 Text(supplier ? 'You are supplying' : 'You hired from them', style: EvType.small),
               ]),
             ),
-            if (other.phone != null) EvIconButton(LucideIcons.phone, tooltip: 'Call', onPressed: () => launchUrl(Uri.parse('tel:${other.phone}'))),
-            if (other.whatsapp != null)
-              EvIconButton(LucideIcons.messageCircle, tooltip: 'WhatsApp', onPressed: () => launchUrl(Uri.parse('https://wa.me/${ZambianPhone.waDigits(other.whatsapp!)}?text=${Uri.encodeComponent('Re: Evenda booking ${b.reference}')}'), mode: LaunchMode.externalApplication)),
           ]),
-          const SizedBox(height: EvSpace.x4),
+          const SizedBox(height: EvSpace.x3),
+          // Status on the left, contact on the right: the name above keeps the full width.
           Row(children: [
-            StatusPill(b.status.label, tone: toneForBooking(b.status)),
-            const SizedBox(width: 8),
-            if (b.source == BookingSource.now) const StatusPill('Evenda Now', tone: Tone.waiting, icon: LucideIcons.zap),
+            Expanded(
+              child: Wrap(spacing: 8, runSpacing: 6, children: [
+                StatusPill(b.status.label, tone: toneForBooking(b.status)),
+                if (b.source == BookingSource.now) const StatusPill('Evenda Now', tone: Tone.waiting, icon: LucideIcons.zap),
+              ]),
+            ),
+            if (other.phone != null) EvIconButton(LucideIcons.phone, tooltip: 'Call ${other.name}', onPressed: () => launchUrl(Uri.parse('tel:${other.phone}'))),
+            if (other.whatsapp != null)
+              EvIconButton(LucideIcons.messageCircle, tooltip: 'WhatsApp ${other.name}', onPressed: () => launchUrl(Uri.parse('https://wa.me/${ZambianPhone.waDigits(other.whatsapp!)}?text=${Uri.encodeComponent('Re: Evenda booking ${b.reference}')}'), mode: LaunchMode.externalApplication)),
           ]),
         ]),
       ),

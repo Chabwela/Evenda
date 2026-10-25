@@ -97,13 +97,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             if (conflicts.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(EvSpace.gutter, EvSpace.x3, EvSpace.gutter, 0),
-                  child: EvSurface(
-                    color: EvColors.warningTint,
+                  // A warning line with an edge, not a big tinted block.
+                  child: Container(
+                    padding: const EdgeInsets.only(left: EvSpace.x3),
+                    decoration: BoxDecoration(border: Border(left: BorderSide(color: EvColors.warning, width: 3))),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(LucideIcons.triangleAlert, color: EvColors.warning, size: 20),
-                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -112,12 +112,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                               for (final c in conflicts.take(3))
                                 Text(
                                   '${c.title}: ${c.committed} booked, ${c.usable} usable on ${EvDates.day(c.day)}',
-                                  style: EvType.small.copyWith(color: EvColors.warning),
+                                  style: EvType.small.copyWith(color: EvColors.ink),
                                 ),
                               const SizedBox(height: 6),
                               Text(
                                 'Repair damaged items, add stock, or source the shortfall with Evenda Now.',
-                                style: EvType.caption.copyWith(color: EvColors.warning),
+                                style: EvType.caption,
                               ),
                             ],
                           ),
@@ -332,7 +332,7 @@ class _StockCard extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(l.title, style: EvType.bodyStrong, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(l.title, style: EvType.bodyStrong, maxLines: 2, overflow: TextOverflow.ellipsis),
                         // Wraps at large text sizes instead of overflowing.
                         Wrap(
                           children: [

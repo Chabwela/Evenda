@@ -58,15 +58,25 @@ class _EventEditorScreenState extends ConsumerState<EventEditorScreen> {
     });
   }
 
-  Future<void> _pickStart() async {
+  // Date and start time are picked separately, so each has its own full-width field.
+  Future<void> _pickDay() async {
     final d = _d!;
     final day = await pickDate(context, initial: d.startsAt, first: widget.id != null ? DateTime(2020) : null);
     if (day == null || !mounted) return;
-    final t = await pickTime(context, initial: TimeOfDay.fromDateTime(d.startsAt));
-    if (t == null) return;
     final dur = d.endsAt.difference(d.startsAt);
     setState(() {
-      d.startsAt = DateTime(day.year, day.month, day.day, t.hour, t.minute);
+      d.startsAt = DateTime(day.year, day.month, day.day, d.startsAt.hour, d.startsAt.minute);
+      d.endsAt = d.startsAt.add(dur);
+    });
+  }
+
+  Future<void> _pickStartTime() async {
+    final d = _d!;
+    final t = await pickTime(context, initial: TimeOfDay.fromDateTime(d.startsAt));
+    if (t == null || !mounted) return;
+    final dur = d.endsAt.difference(d.startsAt);
+    setState(() {
+      d.startsAt = DateTime(d.startsAt.year, d.startsAt.month, d.startsAt.day, t.hour, t.minute);
       d.endsAt = d.startsAt.add(dur);
     });
   }
@@ -205,10 +215,12 @@ class _EventEditorScreenState extends ConsumerState<EventEditorScreen> {
                   for (final t in EventType.values) EvChip(label: t.label, selected: d.type == t, onTap: () => setState(() => d.type = t)),
                 ]),
                 const SizedBox(height: EvSpace.x4),
+                EvPickerField(label: 'Date', value: EvDates.dayLong(d.startsAt), icon: LucideIcons.calendarDays, onTap: _pickDay),
+                const SizedBox(height: EvSpace.x3),
                 Row(children: [
-                  Expanded(flex: 3, child: EvPickerField(label: 'Starts', value: EvDates.dayTime(d.startsAt), icon: LucideIcons.calendarDays, onTap: _pickStart)),
+                  Expanded(child: EvPickerField(label: 'Starts', value: EvDates.time(d.startsAt), icon: LucideIcons.clock, onTap: _pickStartTime)),
                   const SizedBox(width: 12),
-                  Expanded(flex: 2, child: EvPickerField(label: 'Ends', value: EvDates.time(d.endsAt), icon: LucideIcons.clock, onTap: _pickEnd)),
+                  Expanded(child: EvPickerField(label: 'Ends', value: EvDates.time(d.endsAt), icon: LucideIcons.clock, onTap: _pickEnd)),
                 ]),
                 AnimatedSize(
                   duration: EvMotion.of(context, EvMotion.base),

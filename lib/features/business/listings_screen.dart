@@ -237,25 +237,21 @@ class _ListingCard extends ConsumerWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(EvSpace.x3, EvSpace.x3, EvSpace.x2, EvSpace.x3),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          EvPhoto(l.coverPhoto, width: 72, height: 72, radius: EvRadius.sm, icon: categoryIcon(l.categoryId)),
+          EvPhoto(l.coverPhoto, width: 56, height: 56, radius: EvRadius.sm, icon: categoryIcon(l.categoryId)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(l.title, style: EvType.bodyStrong, maxLines: 2, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 2),
-              Text.rich(TextSpan(children: [
-                TextSpan(text: statusText, style: EvType.caption.copyWith(color: statusColor, fontWeight: FontWeight.w700)),
-                TextSpan(text: '  ·  ${priceLabel(l)}', style: EvType.caption.copyWith(color: EvColors.ink)),
-              ])),
+              // Price on its own line; status and what's offered share the next one.
+              Text(priceLabel(l), style: EvType.small.copyWith(color: EvColors.ink)),
               const SizedBox(height: 2),
-              Text(
-                l.isService
-                    ? '${l.totalQuantity} job${l.totalQuantity == 1 ? '' : 's'} per day'
-                    : l.tracksStock
-                        ? (l.listedQuantity == null ? 'Offering all ${l.usable} in service' : 'Offering up to ${l.offeredQuantity} of ${l.totalQuantity}')
-                        : categoryById(l.categoryId).name,
-                style: EvType.caption,
-              ),
+              Text.rich(TextSpan(style: EvType.caption, children: [
+                TextSpan(text: statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.w700)),
+                TextSpan(
+                  text: '  ·  ${l.isService ? '${l.totalQuantity} job${l.totalQuantity == 1 ? '' : 's'} a day' : l.tracksStock ? (l.listedQuantity == null ? '${l.usable} offered' : '${l.offeredQuantity} of ${l.totalQuantity} offered') : categoryById(l.categoryId).name}',
+                ),
+              ])),
               if (note != null) ...[
                 const SizedBox(height: 4),
                 Text(note, style: EvType.caption.copyWith(color: l.moderation != ModerationStatus.ok ? EvColors.danger : EvColors.warning, fontWeight: FontWeight.w600)),
