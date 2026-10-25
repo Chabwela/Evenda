@@ -87,6 +87,8 @@ object IncomingAlert {
             .setFullScreenIntent(incoming, true)
             .addAction(Notification.Action.Builder(null, "Not now", notNow).build())
             .addAction(Notification.Action.Builder(null, "Make an offer", offer).build())
+        // Unread count for the app icon badge (launchers that show numbers).
+        data["unread"]?.toIntOrNull()?.takeIf { it > 0 }?.let { builder.setNumber(it) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) builder.setTimeoutAfter(45_000)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             @Suppress("DEPRECATION")

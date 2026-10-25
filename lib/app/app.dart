@@ -1,3 +1,4 @@
+import 'package:app_badge_plus/app_badge_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -46,8 +47,27 @@ class _EvendaAppState extends ConsumerState<EvendaApp> with WidgetsBindingObserv
     }
   }
 
+  int? _badge;
+
+  /// Unread notifications as a number on the app icon (launchers that show
+  /// numbers; others show a dot). Cleared when everything is read or on sign-out.
+  Future<void> _setBadge(int count) async {
+    if (count == _badge) return;
+    _badge = count;
+    try {
+      if (await AppBadgePlus.isSupported()) await AppBadgePlus.updateBadge(count);
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen(unreadCountProvider, (_, next) {
+      final n = next.value;
+      if (n != null) _setBadge(n);
+    });
+    ref.listen(sessionProvider, (_, next) {
+      if (next.hasValue && next.value == null) _setBadge(0);
+    });
     // Rebuild once the live category catalogue arrives, so pickers show it.
     ref.watch(categoryCatalogProvider);
     return MaterialApp.router(

@@ -74,6 +74,12 @@ function stringify(data: Record<string, unknown>): Record<string, string> {
   );
 }
 
+// Unread count for the app icon badge (claim_push_deliveries adds it).
+function unread(item: Claimed): number | undefined {
+  const n = Number(item.data.unread);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 999) : undefined;
+}
+
 function urgent(item: Claimed): boolean {
   return item.data.category === "now" || item.data.urgent === true || item.data.urgent === "true";
 }
@@ -99,7 +105,7 @@ function nowRequestMessage(token: string, item: Claimed) {
     android: { priority: "HIGH", ttl: "900s" },
     apns: {
       headers: { "apns-priority": "10" },
-      payload: { aps: { alert: { title: item.title, body: item.body }, sound: "default", "interruption-level": "time-sensitive" } },
+      payload: { aps: { alert: { title: item.title, body: item.body }, sound: "default", badge: unread(item) ?? 0, "interruption-level": "time-sensitive" } },
     },
   };
 }
@@ -116,12 +122,13 @@ async function sendOne(sa: ServiceAccount, token: string, item: Claimed): Promis
         // Channels are created by the app (MainActivity). Urgent = Evenda Now and
         // critical reminders (long alert); activity = quotes and bookings (pops up
         // with the chime); the rest = reminders and updates.
+        // notification_count: the number launchers show on the app icon.
         android: urgent(item)
-          ? { priority: "HIGH", notification: { channel_id: "evenda_urgent_v2", sound: "evenda_urgent", tag: String(item.data.notification_id ?? "") } }
+          ? { priority: "HIGH", notification: { channel_id: "evenda_urgent_v2", sound: "evenda_urgent", tag: String(item.data.notification_id ?? ""), notification_count: unread(item) } }
           : activity(item)
-          ? { priority: "HIGH", notification: { channel_id: "evenda_activity_v1", sound: "evenda_chime", tag: String(item.data.notification_id ?? "") } }
-          : { priority: "NORMAL", notification: { channel_id: "evenda_default_v2", sound: "evenda_chime", tag: String(item.data.notification_id ?? "") } },
-        apns: { payload: { aps: { sound: "default", ...(urgent(item) ? { "interruption-level": "time-sensitive" } : {}) } } },
+          ? { priority: "HIGH", notification: { channel_id: "evenda_activity_v1", sound: "evenda_chime", tag: String(item.data.notification_id ?? ""), notification_count: unread(item) } }
+          : { priority: "NORMAL", notification: { channel_id: "evenda_default_v2", sound: "evenda_chime", tag: String(item.data.notification_id ?? ""), notification_count: unread(item) } },
+        apns: { payload: { aps: { sound: "default", badge: unread(item) ?? 0, ...(urgent(item) ? { "interruption-level": "time-sensitive" } : {}) } } },
       },
     }),
   });
