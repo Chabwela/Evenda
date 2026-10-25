@@ -1,4 +1,6 @@
 {
   "SUPABASE_URL": "https://plihgjgaabxwlbugqbni.supabase.co",
-  "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_h-G5GdACswONm25AOMO0WA_EedeK-xm"
+  "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_h-G5GdACswONm25AOMO0WA_EedeK-xm",
+  "PRIVACY_POLICY_URL": "https://chabwela.github.io/Evenda/privacy-policy.html",
+  "ACCOUNT_DELETION_URL": "https://chabwela.github.io/Evenda/delete-account.html"
 }
